@@ -37,15 +37,21 @@
         /* ローディングスピナー */
         .loader {
             border: 4px solid #f3f4f6; /* gray-100 */
-            border-top: 4px solid #3b82f6; /* blue-500 */
+            border-top: 4px solid #f3f4f6; /* gray-100 */
+            border-right: 4px solid #3b82f6; /* blue-500 */
             border-radius: 50%;
             width: 40px;
             height: 40px;
             animation: spin 1s linear infinite;
         }
+        /* スピナーのアニメーションを修正 */
         @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+            0% { 
+                transform: rotate(0deg); 
+            }
+            100% { 
+                transform: rotate(360deg); 
+            }
         }
         
     </style>
@@ -82,10 +88,19 @@
             </div>
         </div>
 
-        <!-- 「戻る」ボタン -->
-        <button id="back-to-selection" class="hidden mb-6 bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg shadow transition duration-300 self-start">
-            &larr; 戻る
-        </button>
+        <!-- 「戻る」ボタンと現在時刻 (変更) -->
+        <div id="top-controls-container" class="hidden flex justify-between items-center mb-6">
+            <button id="back-to-selection" class="bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg shadow transition duration-300 self-start">
+                &larr; 戻る
+            </button>
+            
+            <div id="current-time-display" class="flex items-center text-lg text-gray-700 font-semibold">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span id="current-time-display-span">--:--:--</span>
+            </div>
+        </div>
 
         <!-- 入力UIコンテナ (最初は非表示) -->
         <div id="input-ui-container" class="hidden">
@@ -149,7 +164,7 @@ Line 2"></textarea>
 
             <!-- 衛星名とオプションボタン -->
             <div class="flex flex-col md:flex-row justify-between md:items-center mb-6 gap-6">
-                <!-- 左側: 衛星名 + 観測地点 -->
+                <!-- 左側: 衛星名 -->
                 <div class="flex flex-col gap-2">
                     <h2 id="satellite-display-name" class="text-4xl font-bold text-gray-900"></h2>
                 </div>
@@ -195,7 +210,12 @@ Line 2"></textarea>
                 <!-- ヘッダーとダウンロードボタン -->
                 <div class="flex justify-between items-center mb-6">
                     <h3 class="text-2xl font-semibold">パス詳細</h3>
-                    <div class="flex gap-3">
+                    <div class="flex gap-3 items-center"> <!-- TRACKボタンのために items-center を追加 -->
+                        <!-- TRACKボタンコンテナ -->
+                        <span id="tracking-button-container">
+                            <!-- ここにJSでTRACKボタンが挿入されます -->
+                        </span>
+                        
                         <button id="download-image-button" title="画像 (PNG) としてダウンロード" class="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 transition duration-150">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -212,12 +232,12 @@ Line 2"></textarea>
                 <!-- ダウンロードエラー表示用 -->
                 <p id="download-error-message" class="text-red-500 text-center mb-4 hidden"></p>
 
-                
+                <!-- AOS/MAX/LOS/Duration -->
                 <div id="pass-detail-text" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8 items-stretch">
-                    <!-- ここに詳細が挿入されます -->
+                    <!-- ここにAOS, MAX, LOS, Duration が挿入されます -->
                 </div>
 
-                <!-- グラフコンテナ (レイアウト変更) -->
+                <!-- グラフコンテナ -->
                 <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
                     <!-- 仰角グラフ (lg:col-span-3) -->
                     <div class="lg:col-span-3 bg-gray-50 p-4 rounded-lg shadow-inner relative">
@@ -313,6 +333,57 @@ Line 2"></textarea>
         </div>
     </div>
 
+    <!-- (変更) リアルタイム追跡モーダル -->
+    <div id="tracking-modal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-80 flex items-center justify-center z-50 p-4 transition-opacity duration-300">
+        <div class="bg-white rounded-lg shadow-2xl w-full max-w-xl p-8 text-center relative">
+            
+            <!-- 閉じるボタン -->
+            <button id="close-tracking-modal-button" title="閉じる" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+
+            <h3 class="text-2xl font-semibold mb-4">リアルタイム追跡</h3>
+            
+            <!-- 現在時刻 (追加) -->
+            <p id="tracking-modal-current-time" class="text-xl text-gray-700 mb-6">--:--:--</p>
+
+            <!-- AOS/MAX/LOS (追加) -->
+            <div class="grid grid-cols-3 gap-4 mb-8">
+                <div class="bg-blue-50 p-3 rounded-lg">
+                    <span class="text-xs font-semibold text-blue-700 tracking-wider uppercase">AOS</span>
+                    <p id="tracking-modal-aos-time" class="text-2xl font-bold text-blue-900 mt-1">--:--:--</p>
+                </div>
+                <div class="bg-green-50 p-3 rounded-lg">
+                    <span class="text-xs font-semibold text-green-700 tracking-wider uppercase">MAX EL</span>
+                    <p id="tracking-modal-max-el" class="text-2xl font-bold text-green-900 mt-1">--.-°</p>
+                </div>
+                <div class="bg-red-50 p-3 rounded-lg">
+                    <span class="text-xs font-semibold text-red-700 tracking-wider uppercase">LOS</span>
+                    <p id="tracking-modal-los-time" class="text-2xl font-bold text-red-900 mt-1">--:--:--</p>
+                </div>
+            </div>
+
+            <!-- El/Az -->
+            <div class="grid grid-cols-2 gap-6 mb-4">
+                <!-- 仰角 -->
+                <div class="bg-gray-100 p-6 rounded-lg">
+                    <span class="text-sm font-semibold text-gray-600 tracking-wider uppercase">仰角 (El)</span>
+                    <p id="tracking-modal-el" class="text-7xl font-bold text-gray-900 mt-2">--.-°</p>
+                </div>
+                <!-- 方位角 -->
+                <div class="bg-gray-100 p-6 rounded-lg">
+                    <span class="text-sm font-semibold text-gray-600 tracking-wider uppercase">方位 (Az)</span>
+                    <p id="tracking-modal-az" class="text-7xl font-bold text-gray-900 mt-2">--.-°</p>
+                </div>
+            </div>
+            <p id="tracking-modal-az-compass" class="text-3xl text-gray-700 font-light mb-6">（--）</p>
+
+            <!-- 「追跡を停止」ボタンは削除 -->
+        </div>
+    </div>
+
 
     <!-- 描画・軌道計算ライブラリ -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -321,9 +392,9 @@ Line 2"></textarea>
 
     <!-- 完全なJavaScriptコード -->
     <script>
-        window.onload = async () => { // 修正: async に
+        window.onload = async () => {
 
-            // --- URLパラメータの解析 (新規追加) ---
+            // --- URLパラメータの解析 ---
             const urlParams = new URLSearchParams(window.location.search);
             const satelliteNameFromUrl = urlParams.get('satellite');
 
@@ -331,7 +402,9 @@ Line 2"></textarea>
             const selectionUI = document.getElementById('selection-ui');
             const inputUIContainer = document.getElementById('input-ui-container');
             const visualizationArea = document.getElementById('visualization-area');
+            const topControlsContainer = document.getElementById('top-controls-container'); // (変更)
             const backToSelectionButton = document.getElementById('back-to-selection');
+            const currentTimeDisplaySpan = document.getElementById('current-time-display-span'); // (追加)
 
             const fetchCelestrakButton = document.getElementById('fetch-celestrak');
             const manualTleButton = document.getElementById('manual-tle');
@@ -360,6 +433,7 @@ Line 2"></textarea>
 
             const passDetailContainer = document.getElementById('pass-detail-container');
             const passDetailText = document.getElementById('pass-detail-text');
+            const trackingButtonContainer = document.getElementById('tracking-button-container'); // TRACKボタンコンテナ
             const passChartCanvas = document.getElementById('pass-chart-canvas');
             const skyPassCanvas = document.getElementById('sky-pass-canvas');
             const passChartCtx = passChartCanvas.getContext('2d');
@@ -378,18 +452,34 @@ Line 2"></textarea>
             const obsLonInput = document.getElementById('obs-lon');
             const obsAltInput = document.getElementById('obs-alt'); 
 
+            // --- (変更) リアルタイム追跡モーダル ---
+            const trackingModal = document.getElementById('tracking-modal');
+            const closeTrackingModalButton = document.getElementById('close-tracking-modal-button');
+            // const stopTrackingButton = document.getElementById('stop-tracking-button'); // 削除
+            const trackingModalEl = document.getElementById('tracking-modal-el');
+            const trackingModalAz = document.getElementById('tracking-modal-az');
+            const trackingModalAzCompass = document.getElementById('tracking-modal-az-compass');
+            const trackingModalCurrentTime = document.getElementById('tracking-modal-current-time'); // (追加)
+            const trackingModalAosTime = document.getElementById('tracking-modal-aos-time'); // (追加)
+            const trackingModalMaxEl = document.getElementById('tracking-modal-max-el'); // (追加)
+            const trackingModalLosTime = document.getElementById('tracking-modal-los-time'); // (追加)
+
             // --- 状態管理変数 ---
             let allSatellites = []; 
             let isDataFetched = false; 
             let selectedTLE = { name: '', line1: '', line2: '' }; 
             let currentPasses = []; 
+            let passTrackingTimer = null; // TRACK機能
+            let realTimeTrackerInterval = null; // (追加) リアルタイム追跡用
+            let currentSatrec = null; // (追加)
+            let currentObserverGd = null; // (追加)
+            let currentSelectedPass = null; // (追加)
             
             // --- イベントリスナー ---
 
-            // CelesTrakボタンはキャッシュチェック関数を呼ぶ (修正: async)
             fetchCelestrakButton.addEventListener('click', async () => {
                 showInputUI('celestrak');
-                await checkAndFetchTLEData(); // 修正: await
+                await checkAndFetchTLEData(); 
             });
 
             manualTleButton.addEventListener('click', () => {
@@ -440,28 +530,44 @@ Line 2"></textarea>
                 }
             });
 
-            // ダウンロードボタンのリスナー
             downloadImageButton.addEventListener('click', downloadPassDetailAsImage);
             downloadPdfButton.addEventListener('click', downloadPassDetailAsPDF);
 
-            // --- 起動時処理 (URLパラメータチェック) (修正: await) ---
+            // --- (変更) リアルタイム追跡モーダルリスナー ---
+            closeTrackingModalButton.addEventListener('click', stopRealTimeTracking);
+            // stopTrackingButton.addEventListener('click', stopRealTimeTracking); // 削除
+            trackingModal.addEventListener('click', (e) => {
+                if (e.target === trackingModal) {
+                    stopRealTimeTracking();
+                }
+            });
+
+
+            // --- 起動時処理 (URLパラメータチェック & 時刻表示) --- (変更)
+            
+            // リアルタイム時刻表示を開始 (追加)
+            function updateCurrentTime() {
+                const now = new Date();
+                currentTimeDisplaySpan.textContent = formatTimeJST(now, true) + " (JST)";
+            }
+            updateCurrentTime(); // 即時実行
+            setInterval(updateCurrentTime, 1000); // 1秒ごとに更新
+
+
             if (satelliteNameFromUrl) {
-                // URLに衛星名が指定されている場合、CelesTrakのUIを表示
                 showInputUI('celestrak');
-                // キャッシュをチェックし、データ取得後に指定された衛星を検索
-                await checkAndFetchTLEData(satelliteNameFromUrl); // 修正: await
+                await checkAndFetchTLEData(satelliteNameFromUrl);
             }
             
-            // --- 画面切り替え関数 ---
+            // --- 画面切り替え関数 --- (変更)
 
             function showSelectionUI() {
                 selectionUI.classList.remove('hidden');
                 inputUIContainer.classList.add('hidden');
                 visualizationArea.classList.add('hidden');
-                backToSelectionButton.classList.add('hidden');
+                topControlsContainer.classList.add('hidden'); // (変更)
                 resetForms();
                 
-                // URLパラメータをクリア (任意)
                 if (window.history.pushState) {
                     const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
                     window.history.pushState({path: cleanUrl}, '', cleanUrl);
@@ -472,7 +578,7 @@ Line 2"></textarea>
                 selectionUI.classList.add('hidden');
                 inputUIContainer.classList.remove('hidden');
                 visualizationArea.classList.add('hidden');
-                backToSelectionButton.classList.remove('hidden');
+                topControlsContainer.classList.remove('hidden'); // (変更)
                 
                 if (mode === 'celestrak') {
                     celestrakForm.classList.remove('hidden');
@@ -487,7 +593,7 @@ Line 2"></textarea>
                 selectionUI.classList.add('hidden');
                 inputUIContainer.classList.add('hidden');
                 visualizationArea.classList.remove('hidden');
-                backToSelectionButton.classList.remove('hidden');
+                topControlsContainer.classList.remove('hidden'); // (変更)
             }
 
             function resetForms() {
@@ -508,11 +614,7 @@ Line 2"></textarea>
 
             // --- CelesTrak関連関数 (キャッシュロジック修正) ---
 
-            /**
-             * TLEデータのキャッシュを確認し、必要なら取得する (修正: async)
-             * @param {string} [satelliteToSelect] - データロード後に自動選択する衛星名
-             */
-            async function checkAndFetchTLEData(satelliteToSelect = null) { // 修正: async
+            async function checkAndFetchTLEData(satelliteToSelect = null) {
                 const cacheKey = 'tleDataCache';
                 let cachedData = null;
 
@@ -523,9 +625,7 @@ Line 2"></textarea>
                     cachedData = null;
                 }
 
-                // キャッシュの有効性チェック
                 if (cachedData && cachedData.data && isCacheValid(cachedData.timestamp)) {
-                    // キャッシュが有効な場合
                     loadingText.textContent = 'キャッシュからTLEデータを読込中...';
                     allSatellites = parseTLEData(cachedData.data);
                     isDataFetched = true;
@@ -536,44 +636,29 @@ Line 2"></textarea>
                     loadingText.classList.add('hidden');
                     satelliteSearch.disabled = false;
 
-                    // URLパラメータで指定された衛星を自動選択
                     if (satelliteToSelect) {
                         autoSelectSatelliteByName(satelliteToSelect);
                     }
                 } else {
-                    // キャッシュが無効な場合
-                    await fetchTLEData('active', satelliteToSelect); // 修正: await
+                    await fetchTLEData('active', satelliteToSelect);
                 }
             }
 
-            /**
-             * キャッシュのタイムスタンプが有効か（午前/午後の区分で）判定する
-             * @param {number} timestamp - キャッシュ保存時のタイムスタンプ (ms)
-             * @returns {boolean}
-             */
             function isCacheValid(timestamp) {
                 if (!timestamp) return false;
 
                 const now = new Date();
                 const cacheDate = new Date(timestamp);
 
-                // 1. 同じ日かどうか
                 const isSameDay = now.toDateString() === cacheDate.toDateString();
                 if (!isSameDay) return false;
 
-                // 2. 0時と12時を基準に、同じ区分（午前/午後）か判定
-                const nowHalf = now.getHours() < 12 ? 0 : 1; // 0:午前, 1:午後
-                const cacheHalf = cacheDate.getHours() < 12 ? 0 : 1; // 0:午前, 1:午後
+                const nowHalf = now.getHours() < 12 ? 0 : 1; 
+                const cacheHalf = cacheDate.getHours() < 12 ? 0 : 1; 
 
                 return nowHalf === cacheHalf;
             }
 
-
-            // CelesTrakからTLEデータを取得 (checkAndFetchTLEDataから呼ばれる)
-            /**
-             * @param {string} group
-             * @param {string} [satelliteToSelect] - データロード後に自動選択する衛星名
-             */
             async function fetchTLEData(group, satelliteToSelect = null) {
                 // celestrak.com に直接アクセス
                 const url = `https://celestrak.com/NORAD/elements/gp.php?GROUP=${group}&FORMAT=tle`;
@@ -588,6 +673,10 @@ Line 2"></textarea>
                     const response = await fetch(url);
                     
                     if (!response.ok) {
+                        // 403 Forbiddenなどの場合、プロキシ経由で再試行
+                        if (response.status === 403) {
+                            throw new Error(`Direct access forbidden (403), retrying with proxy...`);
+                        }
                         throw new Error(`Network response was not ok: ${response.status} ${response.statusText}`);
                     }
                     const tleData = await response.text();
@@ -613,7 +702,6 @@ Line 2"></textarea>
                     loadingText.classList.add('hidden');
                     satelliteSearch.disabled = false;
                     
-                    // URLパラメータで指定された衛星を自動選択
                     if (satelliteToSelect) {
                         autoSelectSatelliteByName(satelliteToSelect);
                     }
@@ -621,9 +709,9 @@ Line 2"></textarea>
                 } catch (error) {
                     console.error('Error fetching TLE data:', error);
                     
-                    if (error.message.includes("403")) {
+                    if (error.message.includes("403") || error.message.includes("proxy")) {
                         loadingText.textContent = '直接アクセスが拒否されました。プロキシ経由で再試行します...';
-                        await fetchTLEDataWithProxy(group, satelliteToSelect); // 引き継ぐ
+                        await fetchTLEDataWithProxy(group, satelliteToSelect);
                     } else {
                         loadingText.textContent = `データの取得に失敗しました: ${error.message}`;
                         loadingSpinner.classList.add('hidden');
@@ -631,12 +719,8 @@ Line 2"></textarea>
                 }
             }
 
-            // CelesTrakからプロキシ経由で取得 (フォールバック)
-            /**
-             * @param {string} group
-             * @param {string} [satelliteToSelect] - データロード後に自動選択する衛星名
-             */
             async function fetchTLEDataWithProxy(group, satelliteToSelect = null) {
+                // api.allorigins.win を使用
                 const proxiedUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://celestrak.org/NORAD/elements/gp.php?GROUP=${group}&FORMAT=tle`)}`;
                 
                 try {
@@ -668,7 +752,6 @@ Line 2"></textarea>
                     loadingText.classList.add('hidden');
                     satelliteSearch.disabled = false;
 
-                    // URLパラメータで指定された衛星を自動選択
                     if (satelliteToSelect) {
                         autoSelectSatelliteByName(satelliteToSelect);
                     }
@@ -680,8 +763,6 @@ Line 2"></textarea>
                 }
             }
 
-
-            // 3行形式のTLEテキストデータをパース
             function parseTLEData(data) {
                 const lines = data.split('\n').filter(line => line.trim() !== '');
                 const satellites = [];
@@ -697,7 +778,6 @@ Line 2"></textarea>
                 return satellites;
             }
 
-            // TLE入力（手動）のパース (2行または3行)
             function parseTLE(data) {
                 const lines = data.split('\n').filter(line => line.trim() !== '');
                 let name = 'Untitled Satellite';
@@ -733,7 +813,6 @@ Line 2"></textarea>
                 }
             }
 
-            // 衛星リストをコンテナに表示
             function displaySatellites(sats) {
                 satelliteListContainer.innerHTML = '';
                 if (sats.length === 0) {
@@ -754,10 +833,6 @@ Line 2"></textarea>
                 satelliteListContainer.appendChild(fragment);
             }
 
-            /**
-             * 最終取得時刻をフォーマットして表示
-             * @param {number} timestamp - タイムスタンプ (ms)
-             */
             function displayLastFetchTime(timestamp) {
                 if (!timestamp) {
                     lastFetchTimeContainer.classList.add('hidden');
@@ -774,8 +849,6 @@ Line 2"></textarea>
                 lastFetchTimeContainer.classList.remove('hidden');
             }
 
-
-            // CelesTrakリストから衛星が選択された
             function selectSatellite(sat) {
                 selectedTLE = sat;
 
@@ -796,16 +869,11 @@ Line 2"></textarea>
                 }
             }
 
-            /**
-             * URLパラメータから渡された名前で衛星を自動選択する (新規追加)
-             * @param {string} satelliteName
-             */
             function autoSelectSatelliteByName(satelliteName) {
                 if (!satelliteName || !allSatellites.length) {
                     return;
                 }
                 
-                // 完全一致または前方一致で検索
                 const normalizedName = satelliteName.toLowerCase();
                 let foundSat = allSatellites.find(sat => sat.name.toLowerCase() === normalizedName);
                 
@@ -814,10 +882,8 @@ Line 2"></textarea>
                 }
 
                 if (foundSat) {
-                    // 見つかった衛星を選択し、可視化画面に移動
                     selectSatellite(foundSat);
                 } else {
-                    // 見つからなかった場合、検索ボックスに名前を入れておく
                     satelliteSearch.value = satelliteName;
                     const filteredSats = allSatellites.filter(sat => sat.name.toLowerCase().includes(normalizedName));
                     displaySatellites(filteredSats);
@@ -851,13 +917,25 @@ Line 2"></textarea>
                         throw new Error("緯度・経度・高度の値が無効です。");
                     }
 
-                    const observerGd = {
+                    // (変更) 観測地点とSatrecをグローバルに保存
+                    currentObserverGd = {
                         latitude: window.satellite.degreesToRadians(obsLat),
                         longitude: window.satellite.degreesToRadians(obsLon),
                         height: obsAltKm // km単位
                     };
 
-                    currentPasses = calculateRealPasses(selectedTLE, observerGd, durationDays);
+                    currentSatrec = window.satellite.twoline2satrec(selectedTLE.line1, selectedTLE.line2);
+                    if (!currentSatrec || currentSatrec.error) {
+                        let errorMsg = `Satrecの初期化に失敗しました。`;
+                        if (currentSatrec.error) {
+                            errorMsg += ` (Error code: ${currentSatrec.error})`;
+                        }
+                        currentSatrec = null;
+                        throw new Error(errorMsg);
+                    }
+
+
+                    currentPasses = calculateRealPasses(currentSatrec, currentObserverGd, durationDays);
 
                     renderPassList();
                     
@@ -876,16 +954,8 @@ Line 2"></textarea>
 
             // --- 軌道計算 (satellite.js) ---
 
-            function calculateRealPasses(tle, observerGd, durationDays) {
-                const satrec = window.satellite.twoline2satrec(tle.line1, tle.line2);
-                if (!satrec || satrec.error) {
-                    let errorMsg = `Satrecの初期化に失敗しました。`;
-                    if (satrec.error) {
-                        errorMsg += ` (Error code: ${satrec.error})`;
-                    }
-                    console.error(errorMsg, tle);
-                    throw new Error(errorMsg);
-                }
+            function calculateRealPasses(satrec, observerGd, durationDays) {
+                // (変更) satrecの初期化を移動
 
                 const allPasses = [];
                 let currentPass = null;
@@ -900,8 +970,8 @@ Line 2"></textarea>
                     const positionAndVelocity = window.satellite.propagate(satrec, d);
                     
                     if (!positionAndVelocity || !positionAndVelocity.position || !positionAndVelocity.velocity) {
-                        console.warn(`[${tle.name}] at ${d.toISOString()}: 伝播エラー。計算を中止します。`);
-                        throw new Error(`衛星[${tle.name}]の伝播(propagate)に失敗しました。`);
+                        console.warn(`[${selectedTLE.name}] at ${d.toISOString()}: 伝播エラー。計算を中止します。`);
+                        throw new Error(`衛星[${selectedTLE.name}]の伝播(propagate)に失敗しました。`);
                     }
                     
                     const gmst = window.satellite.gstime(d);
@@ -915,7 +985,7 @@ Line 2"></textarea>
                     if (elevation >= 0) {
                         if (currentPass === null) {
                             currentPass = {
-                                satellite: tle.name,
+                                satellite: selectedTLE.name,
                                 startTime: new Date(d.getTime()),
                                 maxElevation: elevation,
                                 maxElevationTime: new Date(d.getTime()),
@@ -1010,12 +1080,15 @@ Line 2"></textarea>
             }
 
             function showPassDetails(pass) {
+                currentSelectedPass = pass; // (追加) 現在のパスを保存
+
                 passDetailContainer.classList.remove('hidden');
-                downloadErrorMessage.classList.add('hidden'); // エラーメッセージをクリア
+                downloadErrorMessage.classList.add('hidden');
                 
                 const aosTime = pass.timelineData[0];
                 const losTime = pass.timelineData[pass.timelineData.length - 1];
 
+                // 4列のHTML
                 passDetailText.innerHTML = `
                     <div class="bg-blue-100 p-4 rounded-lg shadow-inner h-full flex flex-col justify-evenly">
                         <span class="text-sm font-semibold text-blue-800 tracking-wider uppercase">AOS</span>
@@ -1052,6 +1125,49 @@ Line 2"></textarea>
                     </div>
                 `;
 
+                // --- リアルタイム追跡ボタンのロジック (アイコン削除) ---
+                
+                // 以前のタイマーをクリア
+                if (passTrackingTimer) {
+                    clearInterval(passTrackingTimer);
+                    passTrackingTimer = null;
+                }
+                
+                trackingButtonContainer.innerHTML = ''; // コンテナを初期化
+
+                // 1秒ごとに現在時刻をチェックするタイマーを設定
+                passTrackingTimer = setInterval(() => {
+                    const now = new Date().getTime();
+                    const startTime = pass.startTime.getTime();
+                    const endTime = pass.endTime.getTime();
+
+                    // 現在時刻がパスのAOSとLOSの間にあるか
+                    if (now >= startTime && now <= endTime) {
+                        // ボタンがまだ表示されていない場合のみ作成
+                        if (trackingButtonContainer.innerHTML === '') {
+                             trackingButtonContainer.innerHTML = `
+                                <!-- (変更) buttonタグに変更 -->
+                                <button id="track-button-dynamic" class="flex items-center gap-2 text-white font-bold py-2 px-3 rounded-lg text-sm transition duration-300" style="background-color: #d50019;">
+                                    TRACK
+                                </button>
+                            `;
+                            // (追加) ボタンにイベントリスナーを追加
+                            document.getElementById('track-button-dynamic').addEventListener('click', startRealTimeTracking);
+                        }
+                    } else {
+                        // パスが終了したか、まだ始まっていない場合
+                        trackingButtonContainer.innerHTML = '';
+                        // (追加) パスが終了したら、追跡モーダルも閉じる
+                        if (now > endTime) {
+                            if (passTrackingTimer) {
+                                clearInterval(passTrackingTimer);
+                                passTrackingTimer = null;
+                            }
+                            stopRealTimeTracking(); // モーダルを閉じる
+                        }
+                    }
+                }, 1000); // 1秒ごとにチェック
+
                 drawPassChart(pass);
                 drawSkyPassChart(pass);
 
@@ -1059,9 +1175,19 @@ Line 2"></textarea>
             }
 
             function clearPassDetails() {
+                // リアルタイム追跡タイマーを停止
+                if (passTrackingTimer) {
+                    clearInterval(passTrackingTimer);
+                    passTrackingTimer = null;
+                }
+                
+                stopRealTimeTracking(); // (追加) リアルタイム追跡を停止
+                currentSelectedPass = null; // (追加)
+
                 passDetailContainer.classList.add('hidden');
                 passDetailText.innerHTML = '';
-                downloadErrorMessage.classList.add('hidden'); // エラーメッセージをクリア
+                trackingButtonContainer.innerHTML = ''; // コンテナをクリア
+                downloadErrorMessage.classList.add('hidden');
                 passChartCtx.clearRect(0, 0, passChartCanvas.width, passChartCanvas.height);
                 skyPassCtx.clearRect(0, 0, skyPassCanvas.width, skyPassCanvas.height);
                 document.querySelectorAll('.pass-list-row.selected').forEach(r => {
@@ -1259,9 +1385,9 @@ Line 2"></textarea>
                     ctx.stroke();
                     ctx.setLineDash([]);
                     ctx.fillStyle = '#a1a1aa';
-                    ctx.fillText(`${el}°`, center - 15, center - r); // 修正: center - 15
+                    ctx.fillText(`${el}°`, center - 15, center - r);
                 });
-                ctx.fillText('90°', center - 15, center); // 修正: center - 15
+                ctx.fillText('90°', center - 15, center);
 
                 ['N', 'E', 'S', 'W'].forEach((dir, i) => {
                     const angle = window.satellite.degreesToRadians(i * 90 - 90);
@@ -1333,6 +1459,99 @@ Line 2"></textarea>
             }
 
 
+            // --- (変更) リアルタイム追跡関数 ---
+
+            function startRealTimeTracking() {
+                if (!currentSatrec || !currentObserverGd || !currentSelectedPass) {
+                    console.error("リアルタイム追跡を開始できません: 必要なデータが不足しています。");
+                    return;
+                }
+
+                // 追跡モーダルを表示
+                trackingModal.classList.remove('hidden');
+                
+                // (追加) パス情報をモーダルに設定
+                trackingModalAosTime.textContent = formatTimeJST(currentSelectedPass.startTime, true);
+                trackingModalLosTime.textContent = formatTimeJST(currentSelectedPass.endTime, true);
+                trackingModalMaxEl.textContent = `${currentSelectedPass.maxElevation.toFixed(1)}°`;
+
+                // 既存のインターバルをクリア
+                if (realTimeTrackerInterval) {
+                    clearInterval(realTimeTrackerInterval);
+                }
+
+                // 即時実行
+                updateRealTimePosition(); 
+                
+                // 1秒ごとに位置を更新
+                realTimeTrackerInterval = setInterval(updateRealTimePosition, 1000);
+            }
+
+            function stopRealTimeTracking() {
+                // 追跡モーダルを非表示
+                trackingModal.classList.add('hidden');
+                
+                // インターバルをクリア
+                if (realTimeTrackerInterval) {
+                    clearInterval(realTimeTrackerInterval);
+                    realTimeTrackerInterval = null;
+                }
+                
+                // 表示をリセット (変更)
+                trackingModalEl.textContent = '--.-°';
+                trackingModalAz.textContent = '--.-°';
+                trackingModalAzCompass.textContent = '（--）';
+                trackingModalCurrentTime.textContent = '--:--:--';
+                trackingModalAosTime.textContent = '--:--:--';
+                trackingModalLosTime.textContent = '--:--:--';
+                trackingModalMaxEl.textContent = '--.-°';
+            }
+
+            function updateRealTimePosition() {
+                if (!currentSatrec || !currentObserverGd) {
+                    stopRealTimeTracking();
+                    return;
+                }
+
+                try {
+                    const now = new Date();
+                    
+                    // (追加) 現在時刻を更新
+                    trackingModalCurrentTime.textContent = formatTimeJST(now, true) + " (JST)";
+
+                    const positionAndVelocity = window.satellite.propagate(currentSatrec, now);
+                    
+                    if (!positionAndVelocity || !positionAndVelocity.position || !positionAndVelocity.velocity) {
+                        throw new Error("現在の衛星位置の伝播(propagate)に失敗しました。");
+                    }
+
+                    const gmst = window.satellite.gstime(now);
+                    const positionEcf = window.satellite.eciToEcf(positionAndVelocity.position, gmst);
+                    const lookAngles = window.satellite.ecfToLookAngles(currentObserverGd, positionEcf);
+                    
+                    const elevation = window.satellite.radiansToDegrees(lookAngles.elevation);
+                    const azimuth = window.satellite.radiansToDegrees(lookAngles.azimuth);
+
+                    // モーダル内のテキストを更新
+                    trackingModalEl.textContent = `${elevation.toFixed(1)}°`;
+                    trackingModalAz.textContent = `${azimuth.toFixed(1)}°`;
+                    trackingModalAzCompass.textContent = ''; // (変更) 方位表記を削除
+
+                    // (もし仰角がマイナスになったら追跡を停止)
+                    if (elevation < 0 && (!currentSelectedPass || now.getTime() > currentSelectedPass.endTime.getTime())) {
+                        stopRealTimeTracking();
+                    }
+
+                } catch (error) {
+                    console.error("リアルタイム追跡中にエラー:", error);
+                    trackingModalEl.textContent = 'エラー';
+                    trackingModalAz.textContent = 'エラー';
+                    trackingModalAzCompass.textContent = `（${error.message}）`;
+                    stopRealTimeTracking(); // エラーが発生したら停止
+                }
+            }
+
+
             // --- ヘルパー関数 ---
 
             function formatTimeJST(date, showSeconds = false) {
@@ -1356,7 +1575,6 @@ Line 2"></textarea>
                 }).format(date);
             }
 
-            // 方位を日本語に
             function azToCompass(az) {
                 const directions = ['北', '北北東', '北東', '東北東', '東', '東南東', '南東', '南南東', '南', '南南西', '南西', '西南西', '西', '西北西', '北西', '北北西'];
                 const index = Math.round(az / 22.5) % 16;
@@ -1366,20 +1584,13 @@ Line 2"></textarea>
 
             // --- ダウンロード関数 ---
 
-            /**
-             * html2canvas を使ってパス詳細をキャプチャする共通関数
-             * @returns {Promise<HTMLCanvasElement>}
-             */
             function capturePassDetail() {
-                // キャプチャ対象の要素
                 const captureTarget = document.getElementById('pass-detail-container');
                 
-                // html2canvas オプション
                 const options = {
-                    scale: 2, // 高解像度化
+                    scale: 2, 
                     useCORS: true, 
-                    backgroundColor: '#ffffff', // 背景を白に
-                    // スクロール位置を考慮
+                    backgroundColor: '#ffffff',
                     scrollX: 0,
                     scrollY: -window.scrollY,
                 };
@@ -1387,9 +1598,6 @@ Line 2"></textarea>
                 return html2canvas(captureTarget, options);
             }
 
-/**
-             * パス詳細をPNG画像としてダウンロード
-             */
             async function downloadPassDetailAsImage() {
                 if (!selectedTLE.name) return;
                 downloadErrorMessage.classList.add('hidden');
@@ -1413,15 +1621,11 @@ Line 2"></textarea>
                 }
             }
 
-            /**
-             * パス詳細をPDFとしてダウンロード
-             */
             async function downloadPassDetailAsPDF() {
                 if (!selectedTLE.name) return;
                 downloadErrorMessage.classList.add('hidden');
 
                 try {
-                    // jsPDFをwindowオブジェクトから取得
                     const { jsPDF } = window.jspdf;
                     const canvas = await capturePassDetail();
                     const imgData = canvas.toDataURL('image/jpeg', 0.8);
@@ -1429,7 +1633,6 @@ Line 2"></textarea>
                     const canvasWidth = canvas.width;
                     const canvasHeight = canvas.height;
                     
-                    // A4サイズ (mm) 横
                     const a4Width = 297;
                     const a4Height = 210;
                     
@@ -1439,7 +1642,6 @@ Line 2"></textarea>
                         format: 'a4'
                     });
 
-                    // A4横 (297x210) に余白(5mm)を考慮
                     const margin = 5;
                     const usableWidth = a4Width - (margin * 2);
                     const usableHeight = a4Height - (margin * 2);
@@ -1447,18 +1649,14 @@ Line 2"></textarea>
                     const canvasAspect = canvasWidth / canvasHeight;
                     let pdfWidth, pdfHeight;
 
-                    // キャンバスのアスペクト比がA4横より横長か？
                     if (canvasAspect > (usableWidth / usableHeight)) {
-                        // 幅を合わせる
                         pdfWidth = usableWidth;
                         pdfHeight = pdfWidth / canvasAspect;
                     } else {
-                        // 高さを合わせる
                         pdfHeight = usableHeight;
                         pdfWidth = pdfHeight * canvasAspect;
                     }
 
-                    // 中央揃えで配置
                     const x = (a4Width - pdfWidth) / 2;
                     const y = (a4Height - pdfHeight) / 2;
                     

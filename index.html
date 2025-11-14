@@ -47,6 +47,9 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+        
+        /* ツールチップ関連のスタイルは削除されました */
+
     </style>
 </head>
 <body class="bg-gray-100 text-gray-800 font-sans flex flex-col min-h-full">
@@ -147,12 +150,14 @@ Line 2"></textarea>
         <div id="visualization-area" class="hidden bg-white p-8 rounded-lg shadow-xl">
 
             <!-- 衛星名とオプションボタン -->
-            <div class="flex justify-between items-center mb-6 gap-6">
-                <!-- 衛星名 -->
-                <h2 id="satellite-display-name" class="text-4xl font-bold text-gray-900"></h2>
-                
-                <!-- オプションボタン (歯車アイコン) -->
-                <button id="settings-button" title="オプション" class="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 transition duration-150">
+            <div class="flex flex-col md:flex-row justify-between md:items-center mb-6 gap-6">
+                <!-- 左側: 衛星名 + 観測地点 -->
+                <div class="flex flex-col gap-2">
+                    <h2 id="satellite-display-name" class="text-4xl font-bold text-gray-900"></h2>
+                </div>
+
+                <!-- 右側: オプションボタン -->
+                <button id="settings-button" title="オプション" class="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 transition duration-150 self-start md:self-center">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                         <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -168,6 +173,7 @@ Line 2"></textarea>
                     <span id="pass-list-count" class="text-sm text-gray-600 bg-gray-100 px-3 py-1 rounded-full"></span>
                 </div>
                 
+                <!-- スクロール可能なテーブルラッパー -->
                 <div id="pass-list-table-wrapper" class="overflow-x-auto max-h-[40vh] overflow-y-auto border border-gray-200 rounded-lg">
                     <table id="pass-list-table" class="min-w-full divide-y divide-gray-200">
                         <thead class="bg-gray-50 sticky top-0 z-10">
@@ -194,10 +200,15 @@ Line 2"></textarea>
                     <!-- ここに詳細が挿入されます -->
                 </div>
 
+                <!-- グラフコンテナ (レイアウト変更) -->
                 <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
+                    <!-- 仰角グラフ (lg:col-span-3) -->
                     <div class="lg:col-span-3 bg-gray-50 p-4 rounded-lg shadow-inner relative">
                         <canvas id="pass-chart-canvas" class="w-full" height="150"></canvas>
+                        <!-- ツールチップ用HTMLは削除されました -->
                     </div>
+                    
+                    <!-- スカイパス (lg:col-span-2) -->
                     <div class="lg:col-span-2 bg-gray-50 p-4 rounded-lg shadow-inner flex justify-center items-center">
                         <canvas id="sky-pass-canvas" width="350" height="350"></canvas>
                     </div>
@@ -207,6 +218,9 @@ Line 2"></textarea>
         </div>
 
     </main>
+    
+    <!-- ツールチップ用HTMLは削除されました -->
+
 
     <!-- フッター -->
     <footer class="bg-white shadow-inner mt-12 py-6">
@@ -331,6 +345,8 @@ Line 2"></textarea>
             const skyPassCanvas = document.getElementById('sky-pass-canvas');
             const passChartCtx = passChartCanvas.getContext('2d');
             const skyPassCtx = skyPassCanvas.getContext('2d');
+            
+            // ツールチップ関連のDOM取得は削除されました
 
             const settingsModal = document.getElementById('settings-modal');
             const closeSettingsButton = document.getElementById('close-settings-button');
@@ -346,6 +362,7 @@ Line 2"></textarea>
             let isDataFetched = false; 
             let selectedTLE = { name: '', line1: '', line2: '' }; 
             let currentPasses = []; 
+            // ツールチップ用の時系列データ変数は削除されました
 
             // --- イベントリスナー ---
 
@@ -402,6 +419,8 @@ Line 2"></textarea>
                     settingsModal.classList.add('hidden');
                 }
             });
+            
+            // 仰角グラフのツールチップ用イベントリスナーは削除されました
 
             // --- 画面切り替え関数 ---
 
@@ -446,9 +465,9 @@ Line 2"></textarea>
                 tleInputArea.value = '';
                 manualTleError.classList.add('hidden');
                 
-                selectedTLE = { name: '', line1: '', line2: '' };
-                currentPasses = [];
-                clearPassDetails();
+                selectedTLE = { name: '', line1: '', line2: '' }; 
+                currentPasses = []; 
+                clearPassDetails(); 
             }
 
             // --- CelesTrak関連関数 (キャッシュロジック追加) ---
@@ -510,12 +529,7 @@ Line 2"></textarea>
 
             // CelesTrakからTLEデータを取得 (checkAndFetchTLEDataから呼ばれる)
             async function fetchTLEData(group) {
-                // プロキシ(allorigins)を経由して .org から取得
-                // const proxyUrl = 'https://api.allorigins.win/raw?url=';
-                // const targetUrl = encodeURIComponent(`https://celestrak.org/NORAD/elements/gp.php?GROUP=${group}&FORMAT=tle`);
-                // const url = `${proxyUrl}${targetUrl}`;
-                
-                // .com に直接アクセス
+                // celestrak.com に直接アクセス
                 const url = `https://celestrak.com/NORAD/elements/gp.php?GROUP=${group}&FORMAT=tle`;
                 
                 loadingSpinner.classList.remove('hidden');
@@ -525,10 +539,10 @@ Line 2"></textarea>
                 lastFetchTimeContainer.classList.add('hidden'); // 取得中は非表示
 
                 try {
-                    // const response = await fetch(url, { cache: 'no-cache' }); // プロキシ使用時の設定
-                    const response = await fetch(url); // 直接アクセス
+                    const response = await fetch(url);
                     
                     if (!response.ok) {
+                        // 403 Forbidden などのエラー
                         throw new Error(`Network response was not ok: ${response.status} ${response.statusText}`);
                     }
                     const tleData = await response.text();
@@ -557,10 +571,60 @@ Line 2"></textarea>
 
                 } catch (error) {
                     console.error('Error fetching TLE data:', error);
-                    loadingText.textContent = `データの取得に失敗しました: ${error.message}`;
+                    
+                    // --- 403 Forbiddenエラー対策: 代替としてプロキシを試す ---
+                    if (error.message.includes("403")) {
+                        loadingText.textContent = '直接アクセスが拒否されました。プロキシ経由で再試行します...';
+                        await fetchTLEDataWithProxy(group); // 代替関数を呼ぶ
+                    } else {
+                        loadingText.textContent = `データの取得に失敗しました: ${error.message}`;
+                        loadingSpinner.classList.add('hidden');
+                    }
+                }
+            }
+
+            // CelesTrakからプロキシ経由で取得 (fetchTLEDataが失敗した場合のフォールバック)
+            async function fetchTLEDataWithProxy(group) {
+                // api.allorigins.win プロキシを使用
+                const proxiedUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://celestrak.org/NORAD/elements/gp.php?GROUP=${group}&FORMAT=tle`)}`;
+                
+                try {
+                    const response = await fetch(proxiedUrl, { cache: 'no-cache' });
+                    
+                    if (!response.ok) {
+                        throw new Error(`Proxy network response was not ok: ${response.status}`);
+                    }
+                    const tleData = await response.text();
+                    
+                    const currentTimestamp = new Date().getTime();
+
+                    // 取得成功時にLocalStorageに保存
+                    try {
+                        const cachePayload = {
+                            timestamp: currentTimestamp,
+                            data: tleData
+                        };
+                        localStorage.setItem('tleDataCache', JSON.stringify(cachePayload));
+                    } catch (e) {
+                        console.warn("LocalStorageへのキャッシュ保存に失敗:", e);
+                    }
+                    
+                    allSatellites = parseTLEData(tleData);
+                    isDataFetched = true;
+                    displaySatellites(allSatellites);
+                    displayLastFetchTime(currentTimestamp); 
+                    
+                    loadingSpinner.classList.add('hidden');
+                    loadingText.classList.add('hidden');
+                    satelliteSearch.disabled = false;
+
+                } catch (proxyError) {
+                    console.error('Error fetching TLE data via proxy:', proxyError);
+                    loadingText.textContent = `プロキシ経由での取得にも失敗しました: ${proxyError.message}`;
                     loadingSpinner.classList.add('hidden');
                 }
             }
+
 
             // 3行形式のTLEテキストデータをパース
             function parseTLEData(data) {
@@ -726,7 +790,7 @@ Line 2"></textarea>
                     return true; 
                 }
             }
-            
+
             // --- 軌道計算 (satellite.js) ---
 
             function calculateRealPasses(tle, observerGd, durationDays) {
@@ -779,11 +843,12 @@ Line 2"></textarea>
                             };
                         }
                         
+                        // ツールチップ機能は削除されましたが、グラフ描画のためにデータは保持します
                         currentPass.timelineData.push({
                             time: new Date(d.getTime()),
                             elevation: elevation,
                             azimuth: azimuth,
-                            range: lookAngles.range
+                            range: lookAngles.range 
                         });
 
                         if (elevation > currentPass.maxElevation) {
@@ -918,6 +983,7 @@ Line 2"></textarea>
                 document.querySelectorAll('.pass-list-row.selected').forEach(r => {
                     r.classList.remove('selected');
                 });
+                // ツールチップ関連のクリア処理は削除されました
             }
 
             // --- グラフ描画関数 (Canvas) ---
@@ -926,6 +992,8 @@ Line 2"></textarea>
                 const canvas = passChartCanvas;
                 const ctx = passChartCtx;
                 const timeline = pass.timelineData;
+                
+                // ツールチップ用データ保存は削除されました
                 
                 if (!timeline || timeline.length === 0) {
                     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -1101,6 +1169,7 @@ Line 2"></textarea>
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
 
+                // 仰角ラベルを左にずらす (Nと重ならないように)
                 [0, 30, 60].forEach(el => {
                     const r = maxRadius * (1 - el / 90);
                     ctx.beginPath();
@@ -1109,9 +1178,9 @@ Line 2"></textarea>
                     ctx.stroke();
                     ctx.setLineDash([]);
                     ctx.fillStyle = '#a1a1aa';
-                    ctx.fillText(`${el}°`, center, center - r - 8);
+                    ctx.fillText(`${el}°`, center - 15, center - r); // 修正: center - 15
                 });
-                ctx.fillText('90°', center, center - 8);
+                ctx.fillText('90°', center - 15, center); // 修正: center - 15
 
                 ['N', 'E', 'S', 'W'].forEach((dir, i) => {
                     const angle = window.satellite.degreesToRadians(i * 90 - 90);
@@ -1143,18 +1212,23 @@ Line 2"></textarea>
 
                 const endPoint = getCoords(timeline[timeline.length - 1].elevation, timeline[timeline.length - 1].azimuth);
                 
+                // AOS (青)
                 ctx.beginPath();
                 ctx.arc(startPoint.x, startPoint.y, 5, 0, 2 * Math.PI);
-                ctx.fillStyle = '#22c55e';
+                ctx.fillStyle = '#3b82f6'; // blue-500
                 ctx.fill();
+                ctx.fillStyle = '#3b82f6';
                 ctx.fillText('AOS', startPoint.x, startPoint.y + 15);
                 
+                // LOS (赤)
                 ctx.beginPath();
                 ctx.arc(endPoint.x, endPoint.y, 5, 0, 2 * Math.PI);
-                ctx.fillStyle = '#ef4444';
+                ctx.fillStyle = '#ef4444'; // red-500
                 ctx.fill();
+                ctx.fillStyle = '#ef4444';
                 ctx.fillText('LOS', endPoint.x, endPoint.y + 15);
 
+                // MAX (緑)
                 let maxElPoint = timeline[0];
                 let minTimeDiff = Math.abs(timeline[0].time.getTime() - pass.maxElevationTime.getTime());
 
@@ -1170,8 +1244,9 @@ Line 2"></textarea>
                     const maxPoint = getCoords(maxElPoint.elevation, maxElPoint.azimuth);
                     ctx.beginPath();
                     ctx.arc(maxPoint.x, maxPoint.y, 6, 0, 2 * Math.PI);
-                    ctx.fillStyle = '#f59e0b'; // amber-500
+                    ctx.fillStyle = '#22c55e'; // green-500
                     ctx.fill();
+                    ctx.fillStyle = '#22c55e';
                     ctx.fillText('MAX', maxPoint.x, maxPoint.y - 15);
                 }
             }

@@ -963,9 +963,14 @@ Line 2"></textarea>
                 const now = new Date();
                 const endTime = new Date(now.getTime() + durationDays * 24 * 60 * 60 * 1000);
                 
+                // (変更) スキャン開始時刻を現在時刻の30分前からに変更
+                // これにより、現在進行中のパスの正しいAOSを検出する
+                const scanStartTime = new Date(now.getTime() - 30 * 60 * 1000);
+                
                 const scanIntervalMinutes = 1;
 
-                for (let d = new Date(now.getTime()); d < endTime; d.setMinutes(d.getMinutes() + scanIntervalMinutes)) {
+                // (変更) ループの開始時刻を変更
+                for (let d = new Date(scanStartTime.getTime()); d < endTime; d.setMinutes(d.getMinutes() + scanIntervalMinutes)) {
                     
                     const positionAndVelocity = window.satellite.propagate(satrec, d);
                     
@@ -1014,7 +1019,8 @@ Line 2"></textarea>
                             currentPass.endTime = new Date(d.getTime() - scanIntervalMinutes * 60 * 1000);
                             currentPass.duration = (currentPass.endTime.getTime() - currentPass.startTime.getTime()) / (1000 * 60);
                             
-                            if (currentPass.duration >= 2) {
+                            // (変更) パスの終了時刻が「現在時刻」より未来のもの（＝まだ終わっていないパス）のみを追加
+                            if (currentPass.duration >= 2 && currentPass.endTime.getTime() > now.getTime()) {
                                 allPasses.push(currentPass);
                             }
                             currentPass = null;

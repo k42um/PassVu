@@ -1,0 +1,1150 @@
+<!DOCTYPE html>
+<html lang="ja" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Satellites Pass Viewer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* 検索リストが多くの項目を保持できるように高さを調整 */
+        #satellite-list-container {
+            max-height: 40vh; /* 画面の高さの40%を最大値に */
+        }
+        /* スクロールバーのスタイルを（控えめに）適用 */
+        #satellite-list-container::-webkit-scrollbar {
+            width: 8px;
+        }
+        #satellite-list-container::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        #satellite-list-container::-webkit-scrollbar-thumb {
+            background: #d1d5db; /* gray-300 */
+            border-radius: 10px;
+        }
+        #satellite-list-container::-webkit-scrollbar-thumb:hover {
+            background: #9ca3af; /* gray-400 */
+        }
+        /* 選択されたパスリストの行のスタイル */
+        .pass-list-row.selected {
+            background-color: #dbeafe; /* blue-100 */
+        }
+        /* ローディングスピナー */
+        .loader {
+            border: 4px solid #f3f4f6; /* gray-100 */
+            border-top: 4px solid #3b82f6; /* blue-500 */
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800 font-sans flex flex-col min-h-full">
+
+    <!-- ヘッダー -->
+    <header class="bg-white shadow-md">
+        <div class="container mx-auto px-6 py-4">
+            <h1 class="text-3xl font-bold text-gray-900">Satellites Pass Viewer</h1>
+        </div>
+    </header>
+
+    <!-- メインコンテンツ -->
+    <main class="container mx-auto px-6 py-8 mt-8 flex-grow">
+        
+        <!-- TLE 取得方法の選択 -->
+        <div id="selection-ui" class="bg-white p-8 rounded-lg shadow-xl mb-8">
+            <div class="grid md:grid-cols-2 gap-6">
+                <!-- 選択肢 1: Celestrakから取得 -->
+                <button id="fetch-celestrak" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-6 px-8 rounded-lg shadow-lg transition duration-300 ease-in-out transform hover:-translate-y-1">
+                    <span class="text-xl">CelesTrakから取得</span>
+                </button>
+
+                <!-- 選択肢 2: TLEを手動で入力 -->
+                <button id="manual-tle" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-6 px-8 rounded-lg shadow-lg transition duration-300 ease-in-out transform hover:-translate-y-1">
+                    <span class="text-xl">TLEを手動入力</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- 「戻る」ボタン -->
+        <button id="back-to-selection" class="hidden mb-6 bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg shadow transition duration-300">
+            &larr; 戻る
+        </button>
+
+        <!-- 入力UIコンテナ (最初は非表示) -->
+        <div id="input-ui-container" class="hidden">
+
+            <!-- フォーム 1: CelesTrakから検索 (最初は非表示) -->
+            <div id="celestrak-form" class="hidden bg-white p-8 rounded-lg shadow-xl mb-8">
+                <h2 class="text-3xl font-semibold mb-6">CelesTrak 検索</h2>
+
+                <!-- ローディングスピナーと検索ボックス -->
+                <div class="flex justify-center mb-4" id="loading-spinner">
+                    <div class="loader"></div>
+                </div>
+                <p id="loading-text" class="text-center text-gray-600 mb-6">TLEデータを取得中...</p>
+                
+                <input type="text" id="satellite-search" class="w-full p-3 border border-gray-300 rounded-lg mb-4" placeholder="衛星名で検索..." disabled>
+
+                <!-- 衛星リスト -->
+                <div id="satellite-list-container" class="overflow-y-auto border border-gray-200 rounded-lg bg-gray-50">
+                    <!-- 衛星リストがここに動的に挿入されます -->
+                </div>
+
+                <!-- 選択された衛星情報（確認用、デバッグ用） -->
+                <div id="selected-satellite-info" class="mt-6 hidden">
+                    <h3 class="text-xl font-semibold mb-2">選択中のTLE</h3>
+                    <pre class="bg-gray-100 p-4 rounded-lg text-sm overflow-x-auto"></pre>
+                </div>
+            </div>
+
+            <!-- フォーム 2: TLEを手動で入力 (最初は非表示) -->
+            <div id="manual-tle-form" class="hidden bg-white p-8 rounded-lg shadow-xl mb-8">
+                <h2 class="text-3xl font-semibold mb-6">TLEを手動入力</h2>
+                <p class="text-gray-700 mb-4">TLE (3行形式 または 2行形式) を入力してください。</p>
+                
+                <!-- TLE入力エリア -->
+                <textarea id="tle-input-area" class="w-full p-3 border border-gray-300 rounded-lg font-mono text-sm" rows="6" placeholder="Line 0 (Optional Title)
+Line 1
+Line 2"></textarea>
+                
+                <p id="manual-tle-error" class="text-red-500 mt-2 hidden">TLEの解析に失敗しました。フォーマットを確認してください。</p>
+
+                <!-- 可視化ボタン -->
+                <button id="visualize-manual-button" class="mt-6 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg shadow transition duration-300">
+                    可視化
+                </button>
+            </div>
+        </div>
+
+        <!-- 可視化エリア (最初は非表示) -->
+        <div id="visualization-area" class="hidden bg-white p-8 rounded-lg shadow-xl">
+
+            <!-- 衛星名とオプションボタン -->
+            <div class="flex justify-between items-center mb-6 gap-6">
+                <!-- 衛星名 -->
+                <h2 id="satellite-display-name" class="text-4xl font-bold text-gray-900"></h2>
+                
+                <!-- オプションボタン (歯車アイコン) -->
+                <button id="settings-button" title="オプション" class="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 transition duration-150">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                </button>
+            </div>
+
+            <!-- 予測パスリスト -->
+            <div id="pass-list-container" class="mb-8">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-2xl font-semibold">予測パスリスト</h3>
+                    <!-- 件数表示を分離 -->
+                    <span id="pass-list-count" class="text-sm text-gray-600 bg-gray-100 px-3 py-1 rounded-full"></span>
+                </div>
+                
+                <div class="overflow-x-auto">
+                    <table id="pass-list-table" class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">AOS (開始)</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">MAX (最大仰角)</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">LOS (終了)</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Duration (継続時間)</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            <!-- パスリストの行がここに挿入されます -->
+                        </tbody>
+                    </table>
+                </div>
+                <p id="no-passes-message" class="text-gray-500 text-center mt-6 hidden"></p>
+            </div>
+
+            <!-- パス詳細 (最初は非表示) -->
+            <div id="pass-detail-container" class="mt-10 hidden">
+                <h3 class="text-2xl font-semibold mb-6">パス詳細</h3>
+                
+                <!-- AOS, MAX, LOS, Duration の詳細テキスト -->
+                <div id="pass-detail-text" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8 items-stretch">
+                    <!-- ここに詳細が挿入されます -->
+                </div>
+
+                <!-- グラフコンテナ -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <!-- 仰角グラフ (縦) -->
+                    <div class="lg:col-span-2 bg-gray-50 p-4 rounded-lg shadow-inner relative">
+                        <canvas id="pass-chart-canvas" class="w-full" height="150"></canvas>
+                    </div>
+                    <!-- スカイパスグラフ (極座標) -->
+                    <div class="lg:col-span-1 bg-gray-50 p-4 rounded-lg shadow-inner flex justify-center items-center">
+                        <canvas id="sky-pass-canvas" width="350" height="350"></canvas>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+    </main>
+
+    <!-- フッター -->
+    <footer class="bg-white shadow-inner mt-12 py-6">
+        <div class="container mx-auto px-6 text-center text-gray-600 text-sm">
+            &copy; 2025 k42uma
+        </div>
+    </footer>
+
+    <!-- 設定モーダル (最初は非表示) -->
+    <div id="settings-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center z-50 p-4 transition-opacity duration-300">
+        <div class="bg-white rounded-lg shadow-2xl w-full max-w-lg p-8">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-2xl font-semibold">オプション</h3>
+                <button id="close-settings-button" title="閉じる" class="text-gray-400 hover:text-gray-600">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            
+            <div class="space-y-6">
+                <!-- 観測地点 -->
+                <div>
+                    <h4 class="text-lg font-medium text-gray-800 mb-3">観測地点</h4>
+                    <!-- 緯度・経度・高度を3カラムに変更 -->
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div class="flex flex-col gap-2">
+                            <label for="obs-lat" class="text-sm font-medium text-gray-700">緯度 (°) :</label>
+                            <input type="number" id="obs-lat" value="36.11" step="0.1" class="w-full p-2 border border-gray-300 rounded-lg text-sm">
+                        </div>
+                        <div class="flex flex-col gap-2">
+                            <label for="obs-lon" class="text-sm font-medium text-gray-700">経度 (°) :</label>
+                            <input type="number" id="obs-lon" value="140.10" step="0.1" class="w-full p-2 border border-gray-300 rounded-lg text-sm">
+                        </div>
+                        <!-- 高度の入力欄を追加 -->
+                        <div class="flex flex-col gap-2">
+                            <label for="obs-alt" class="text-sm font-medium text-gray-700">高度 (km) :</label>
+                            <input type="number" id="obs-alt" value="0.06" step="0.01" class="w-full p-2 border border-gray-300 rounded-lg text-sm">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 予測設定 -->
+                <div>
+                    <h4 class="text-lg font-medium text-gray-800 mb-3">予測設定</h4>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div class="flex flex-col gap-2">
+                            <label for="duration-select" class="text-sm font-medium text-gray-700">予測期間:</label>
+                            <select id="duration-select" class="w-full p-2 border border-gray-300 rounded-lg text-sm bg-white">
+                                <option value="1">1日</option>
+                                <option value="3">3日</option>
+                                <option value="7" selected>7日</option>
+                                <option value="15">15日</option>
+                                <option value="30">30日</option>
+                            </select>
+                        </div>
+                        <div class="flex flex-col gap-2">
+                            <label for="max-elevation-filter" class="text-sm font-medium text-gray-700">最小仰角:</label>
+                            <select id="max-elevation-filter" class="w-full p-2 border border-gray-300 rounded-lg text-sm bg-white">
+                                <option value="0">0°</option>
+                                <option value="5" selected>5°</option>
+                                <option value="10">10°</option>
+                                <option value="15">15°</option>
+                                <option value="20">20°</option>
+                                <option value="30">30°</option>
+                                <option value="45">45°</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- アクションボタン -->
+            <div class="mt-8 text-right">
+                <button id="apply-settings-button" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg shadow transition duration-300">
+                    設定を適用
+                </button>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- 軌道計算ライブラリ (satellite.js) -->
+    <script src="https://unpkg.com/satellite.js@4.1.4/dist/satellite.min.js"></script>
+
+    <!-- 完全なJavaScriptコード -->
+    <script>
+        // satellite.jsがロードされた後に実行する
+        window.onload = () => {
+
+            // --- DOM要素の取得 ---
+            const selectionUI = document.getElementById('selection-ui');
+            const inputUIContainer = document.getElementById('input-ui-container');
+            const visualizationArea = document.getElementById('visualization-area');
+            const backToSelectionButton = document.getElementById('back-to-selection');
+
+            // 選択ボタン
+            const fetchCelestrakButton = document.getElementById('fetch-celestrak');
+            const manualTleButton = document.getElementById('manual-tle');
+
+            // CelesTrakフォーム
+            const celestrakForm = document.getElementById('celestrak-form');
+            const loadingSpinner = document.getElementById('loading-spinner');
+            const loadingText = document.getElementById('loading-text');
+            const satelliteSearch = document.getElementById('satellite-search');
+            const satelliteListContainer = document.getElementById('satellite-list-container');
+            const selectedSatInfo = document.getElementById('selected-satellite-info');
+
+            // 手動入力フォーム
+            const manualTleForm = document.getElementById('manual-tle-form');
+            const tleInputArea = document.getElementById('tle-input-area');
+            const visualizeManualButton = document.getElementById('visualize-manual-button');
+            const manualTleError = document.getElementById('manual-tle-error');
+
+            // 可視化エリア
+            const satelliteDisplayName = document.getElementById('satellite-display-name');
+            const settingsButton = document.getElementById('settings-button');
+            
+            // パスリスト
+            const passListContainer = document.getElementById('pass-list-container');
+            const passListTableBody = document.querySelector('#pass-list-table tbody');
+            const passListCount = document.getElementById('pass-list-count');
+            const noPassesMessage = document.getElementById('no-passes-message');
+
+            // パス詳細
+            const passDetailContainer = document.getElementById('pass-detail-container');
+            const passDetailText = document.getElementById('pass-detail-text');
+            const passChartCanvas = document.getElementById('pass-chart-canvas');
+            const skyPassCanvas = document.getElementById('sky-pass-canvas');
+            const passChartCtx = passChartCanvas.getContext('2d');
+            const skyPassCtx = skyPassCanvas.getContext('2d');
+
+            // --- モーダル関連 ---
+            const settingsModal = document.getElementById('settings-modal');
+            const closeSettingsButton = document.getElementById('close-settings-button');
+            const applySettingsButton = document.getElementById('apply-settings-button');
+            // モーダル内の入力要素
+            const durationSelect = document.getElementById('duration-select');
+            const maxElevationFilter = document.getElementById('max-elevation-filter');
+            const obsLatInput = document.getElementById('obs-lat');
+            const obsLonInput = document.getElementById('obs-lon');
+            const obsAltInput = document.getElementById('obs-alt'); // 高度入力
+
+
+            // --- 状態管理変数 ---
+            let allSatellites = []; // CelesTrakから取得した全衛星データ
+            let isDataFetched = false; // CelesTrakデータ取得済みフラグ
+            let selectedTLE = { name: '', line1: '', line2: '' }; // 選択中のTLE
+            let currentPasses = []; // 現在表示中の計算済みパス
+
+            // --- イベントリスナー ---
+
+            // 選択画面: CelesTrakから取得
+            fetchCelestrakButton.addEventListener('click', () => {
+                showInputUI('celestrak');
+                if (!isDataFetched) {
+                    fetchTLEData('active');
+                }
+            });
+
+            // 選択画面: 手動入力
+            manualTleButton.addEventListener('click', () => {
+                showInputUI('manual');
+            });
+
+            // フォーム共通: 選択画面に戻る
+            backToSelectionButton.addEventListener('click', () => {
+                showSelectionUI();
+            });
+
+            // CelesTrakフォーム: 検索入力
+            satelliteSearch.addEventListener('input', (e) => {
+                const query = e.target.value.toLowerCase();
+                const filteredSats = allSatellites.filter(sat => sat.name.toLowerCase().includes(query));
+                displaySatellites(filteredSats);
+            });
+
+            // 手動入力フォーム: 可視化ボタン
+            visualizeManualButton.addEventListener('click', () => {
+                const tleString = tleInputArea.value;
+                const parsed = parseTLE(tleString);
+
+                manualTleError.classList.add('hidden');
+                if (parsed.line1 && parsed.line2) {
+                    selectedTLE = parsed;
+                    if (updateVisualizationArea()) { 
+                        showVisualizationArea();
+                    }
+                } else {
+                    manualTleError.classList.remove('hidden');
+                }
+            });
+
+            // --- モーダル関連イベント ---
+            
+            // 可視化エリア: オプションボタン
+            settingsButton.addEventListener('click', () => {
+                settingsModal.classList.remove('hidden');
+            });
+
+            // モーダル: 閉じるボタン
+            closeSettingsButton.addEventListener('click', () => {
+                settingsModal.classList.add('hidden');
+            });
+
+            // モーダル: 設定を適用ボタン
+            applySettingsButton.addEventListener('click', () => {
+                updateVisualizationArea(); // 軌道計算を再実行
+                settingsModal.classList.add('hidden');
+            });
+            
+            // モーダル外のクリックで閉じる (オプション)
+            settingsModal.addEventListener('click', (e) => {
+                if (e.target === settingsModal) {
+                    settingsModal.classList.add('hidden');
+                }
+            });
+
+
+            // --- 画面切り替え関数 ---
+
+            // 選択画面を表示
+            function showSelectionUI() {
+                selectionUI.classList.remove('hidden');
+                inputUIContainer.classList.add('hidden');
+                visualizationArea.classList.add('hidden');
+                backToSelectionButton.classList.add('hidden');
+                resetForms();
+            }
+
+            // 入力フォームを表示
+            function showInputUI(mode) {
+                selectionUI.classList.add('hidden');
+                inputUIContainer.classList.remove('hidden');
+                visualizationArea.classList.add('hidden');
+                backToSelectionButton.classList.remove('hidden');
+                
+                if (mode === 'celestrak') {
+                    celestrakForm.classList.remove('hidden');
+                    manualTleForm.classList.add('hidden');
+                } else if (mode === 'manual') {
+                    celestrakForm.classList.add('hidden');
+                    manualTleForm.classList.remove('hidden');
+                }
+            }
+
+            // 可視化エリアを表示
+            function showVisualizationArea() {
+                selectionUI.classList.add('hidden');
+                inputUIContainer.classList.add('hidden');
+                visualizationArea.classList.remove('hidden');
+                backToSelectionButton.classList.remove('hidden');
+            }
+
+            // フォームリセット
+            function resetForms() {
+                satelliteSearch.value = '';
+                if (isDataFetched) {
+                    displaySatellites(allSatellites);
+                }
+                selectedSatInfo.classList.add('hidden');
+                selectedSatInfo.querySelector('pre').textContent = '';
+
+                tleInputArea.value = '';
+                manualTleError.classList.add('hidden');
+                
+                selectedTLE = { name: '', line1: '', line2: '' };
+                currentPasses = [];
+                clearPassDetails();
+            }
+
+            // --- CelesTrak関連関数 ---
+
+            // CelesTrakからTLEデータを取得
+            async function fetchTLEData(group) {
+                // CORS対応の .com ドメインに直接アクセス
+                const url = `https://celestrak.com/NORAD/elements/gp.php?GROUP=${group}&FORMAT=tle`;
+                
+                loadingSpinner.classList.remove('hidden');
+                loadingText.classList.remove('hidden');
+                loadingText.textContent = 'TLEデータを取得中...';
+                satelliteSearch.disabled = true;
+
+                try {
+                    const response = await fetch(url);
+                    if (!response.ok) {
+                        throw new Error(`Network response was not ok: ${response.status} ${response.statusText}`);
+                    }
+                    const tleData = await response.text();
+                    allSatellites = parseTLEData(tleData);
+                    isDataFetched = true;
+                    displaySatellites(allSatellites);
+                    
+                    loadingSpinner.classList.add('hidden');
+                    loadingText.classList.add('hidden');
+                    satelliteSearch.disabled = false;
+
+                } catch (error) {
+                    console.error('Error fetching TLE data:', error);
+                    loadingText.textContent = `データの取得に失敗しました: ${error.message}`;
+                    loadingSpinner.classList.add('hidden');
+                }
+            }
+
+            // 3行形式のTLEテキストデータをパース
+            function parseTLEData(data) {
+                const lines = data.split('\n').filter(line => line.trim() !== '');
+                const satellites = [];
+                for (let i = 0; i < lines.length; i += 3) {
+                    if (lines[i+1] && lines[i+2]) {
+                        satellites.push({
+                            name: lines[i].trim(),
+                            line1: lines[i+1].trim(),
+                            line2: lines[i+2].trim()
+                        });
+                    }
+                }
+                return satellites;
+            }
+
+            // TLE入力（手動）のパース (2行または3行)
+            function parseTLE(data) {
+                const lines = data.split('\n').filter(line => line.trim() !== '');
+                let name = 'Untitled Satellite';
+                let line1 = '';
+                let line2 = '';
+
+                if (lines.length === 2) {
+                    line1 = lines[0].trim();
+                    line2 = lines[1].trim();
+                    const satNum = line1.substring(2, 7);
+                    name = `SAT ${satNum}`;
+                } else if (lines.length === 3) {
+                    name = lines[0].trim();
+                    line1 = lines[1].trim();
+                    line2 = lines[2].trim();
+                }
+
+                if (!window.satellite) {
+                     console.error("satellite.js がロードされていません。");
+                     return { name: '', line1: '', line2: '' };
+                }
+                try {
+                    const satrec = window.satellite.twoline2satrec(line1, line2);
+                    if (satrec && !satrec.error) {
+                         return { name, line1, line2 };
+                    } else {
+                        console.warn("TLEのパースに失敗 (satrec error):", satrec.error);
+                        return { name: '', line1: '', line2: '' };
+                    }
+                } catch (e) {
+                    console.error("TLEパース中に例外発生:", e);
+                    return { name: '', line1: '', line2: '' };
+                }
+            }
+
+            // 衛星リストをコンテナに表示
+            function displaySatellites(sats) {
+                satelliteListContainer.innerHTML = '';
+                if (sats.length === 0) {
+                    satelliteListContainer.innerHTML = '<p class="p-4 text-center text-gray-500">該当する衛星はありません。</p>';
+                    return;
+                }
+
+                const fragment = document.createDocumentFragment();
+                sats.forEach(sat => {
+                    const button = document.createElement('button');
+                    button.className = "w-full text-left p-3 hover:bg-gray-200 transition duration-150";
+                    button.textContent = sat.name;
+                    button.addEventListener('click', () => {
+                        selectSatellite(sat);
+                    });
+                    fragment.appendChild(button);
+                });
+                satelliteListContainer.appendChild(fragment);
+            }
+
+            // CelesTrakリストから衛星が選択された
+            function selectSatellite(sat) {
+                selectedTLE = sat;
+
+                selectedSatInfo.classList.remove('hidden');
+                selectedSatInfo.querySelector('pre').textContent = `${sat.name}\n${sat.line1}\n${sat.line2}`;
+
+                const buttons = satelliteListContainer.querySelectorAll('button');
+                buttons.forEach(btn => {
+                    if (btn.textContent === sat.name) {
+                        btn.classList.add('bg-blue-100', 'font-semibold');
+                    } else {
+                        btn.classList.remove('bg-blue-100', 'font-semibold');
+                    }
+                });
+
+                if (updateVisualizationArea()) {
+                    showVisualizationArea();
+                }
+            }
+
+            // --- 可視化エリア関数 ---
+
+            /**
+             * 可視化エリアのメインロジック (データ更新トリガー)
+             * @returns {boolean} 計算と描画が成功したかどうか
+             */
+            function updateVisualizationArea() {
+                satelliteDisplayName.textContent = selectedTLE.name;
+                currentPasses = []; 
+                clearPassDetails(); 
+                noPassesMessage.classList.add('hidden'); 
+
+                try {
+                    if (!selectedTLE.line1 || !selectedTLE.line2) {
+                        throw new Error("TLEが選択されていません。");
+                    }
+                    
+                    if (!window.satellite) {
+                        throw new Error("軌道計算ライブラリ(satellite.js)がロードされていません。");
+                    }
+
+                    // モーダルから値を取得
+                    const durationDays = parseInt(durationSelect.value, 10);
+                    const obsLat = parseFloat(obsLatInput.value);
+                    const obsLon = parseFloat(obsLonInput.value);
+                    const obsAlt = parseFloat(obsAltInput.value); // 高度を取得
+
+                    if (isNaN(obsLat) || isNaN(obsLon) || isNaN(obsAlt)) {
+                        throw new Error("緯度・経度・高度の値が無効です。");
+                    }
+
+                    const observerGd = {
+                        latitude: window.satellite.degreesToRadians(obsLat),
+                        longitude: window.satellite.degreesToRadians(obsLon),
+                        height: obsAlt // 高度を (km) で設定
+                    };
+
+                    currentPasses = calculateRealPasses(selectedTLE, observerGd, durationDays);
+
+                    renderPassList();
+                    
+                    return true;
+
+                } catch (error) {
+                    console.error("軌道計算または表示の更新中にエラーが発生しました:", error);
+                    
+                    renderPassList(); 
+                    noPassesMessage.textContent = `軌道計算エラー: ${error.message} (TLEデータが古いか、軌道が減衰した可能性があります)`;
+                    noPassesMessage.classList.remove('hidden');
+                    
+                    return true; 
+                }
+            }
+            
+            // --- 軌道計算 (satellite.js) ---
+
+            /**
+             * satellite.js を使用して実際のパスを計算する
+             * @param {object} tle - { name, line1, line2 }
+             * @param {object} observerGd - 観測地点 (ラジアン) { latitude, longitude, height }
+             * @param {int} durationDays - 予測する日数
+             * @returns {Array} 計算されたパスの配列
+             */
+            function calculateRealPasses(tle, observerGd, durationDays) {
+                const satrec = window.satellite.twoline2satrec(tle.line1, tle.line2);
+                if (!satrec || satrec.error) {
+                    let errorMsg = `Satrecの初期化に失敗しました。`;
+                    if (satrec.error) {
+                        errorMsg += ` (Error code: ${satrec.error})`;
+                    }
+                    console.error(errorMsg, tle);
+                    throw new Error(errorMsg);
+                }
+
+                const allPasses = [];
+                let currentPass = null;
+                
+                const now = new Date();
+                const endTime = new Date(now.getTime() + durationDays * 24 * 60 * 60 * 1000);
+                
+                const scanIntervalMinutes = 1;
+
+                for (let d = new Date(now.getTime()); d < endTime; d.setMinutes(d.getMinutes() + scanIntervalMinutes)) {
+                    
+                    const positionAndVelocity = window.satellite.propagate(satrec, d);
+                    
+                    if (!positionAndVelocity || !positionAndVelocity.position || !positionAndVelocity.velocity) {
+                        console.warn(`[${tle.name}] at ${d.toISOString()}: 伝播エラー。計算を中止します。`);
+                        throw new Error(`衛星[${tle.name}]の伝播(propagate)に失敗しました。`);
+                    }
+                    
+                    const gmst = window.satellite.gstime(d);
+                    const positionEcf = window.satellite.eciToEcf(positionAndVelocity.position, gmst);
+                    
+                    const lookAngles = window.satellite.ecfToLookAngles(observerGd, positionEcf);
+                    
+                    const elevation = window.satellite.radiansToDegrees(lookAngles.elevation);
+                    const azimuth = window.satellite.radiansToDegrees(lookAngles.azimuth);
+
+                    if (elevation >= 0) {
+                        if (currentPass === null) {
+                            currentPass = {
+                                satellite: tle.name,
+                                startTime: new Date(d.getTime()),
+                                maxElevation: elevation,
+                                maxElevationTime: new Date(d.getTime()),
+                                maxElevationAz: azimuth,
+                                endTime: null,
+                                duration: 0,
+                                timelineData: []
+                            };
+                        }
+                        
+                        currentPass.timelineData.push({
+                            time: new Date(d.getTime()),
+                            elevation: elevation,
+                            azimuth: azimuth,
+                            range: lookAngles.range
+                        });
+
+                        if (elevation > currentPass.maxElevation) {
+                            currentPass.maxElevation = elevation;
+                            currentPass.maxElevationTime = new Date(d.getTime());
+                            currentPass.maxElevationAz = azimuth;
+                        }
+
+                    } else {
+                        if (currentPass !== null) {
+                            currentPass.endTime = new Date(d.getTime() - scanIntervalMinutes * 60 * 1000);
+                            currentPass.duration = (currentPass.endTime.getTime() - currentPass.startTime.getTime()) / (1000 * 60);
+                            
+                            if (currentPass.duration >= 2) {
+                                allPasses.push(currentPass);
+                            }
+                            currentPass = null;
+                        }
+                    }
+                } 
+
+                return allPasses;
+            }
+
+
+            // --- 表示レンダリング関数 ---
+
+            // パスリストのテーブルを描画
+            function renderPassList() {
+                passListTableBody.innerHTML = '';
+                
+                // フィルターの値はモーダルから取得
+                const minElevationFilterVal = parseFloat(maxElevationFilter.value);
+                const filteredPasses = currentPasses.filter(pass => pass.maxElevation >= minElevationFilterVal);
+
+                passListCount.textContent = `${filteredPasses.length} 件`;
+
+                if (filteredPasses.length === 0) {
+                    if (noPassesMessage.classList.contains('hidden')) {
+                        noPassesMessage.textContent = `この条件（最小仰角 ${minElevationFilterVal}° 以上）に該当するパスは見つかりませんでした。`;
+                        noPassesMessage.classList.remove('hidden');
+                    }
+                    return;
+                }
+                
+                noPassesMessage.classList.add('hidden');
+                
+                const fragment = document.createDocumentFragment();
+                filteredPasses.forEach(pass => {
+                    const row = document.createElement('tr');
+                    row.className = "pass-list-row cursor-pointer hover:bg-gray-100";
+                    row.innerHTML = `
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm font-medium text-gray-900">${formatTimeJST(pass.startTime)}</div>
+                            <div class="text-sm text-gray-500">${formatDateJST(pass.startTime)}</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm font-medium text-gray-900">${pass.maxElevation.toFixed(1)}°</div>
+                            <div class="text-sm text-gray-500">${formatTimeJST(pass.maxElevationTime)}</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm font-medium text-gray-900">${formatTimeJST(pass.endTime)}</div>
+                            <div class="text-sm text-gray-500">${formatDateJST(pass.endTime)}</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">${pass.duration.toFixed(0)} 分</td>
+                    `;
+                    
+                    row.addEventListener('click', () => {
+                        document.querySelectorAll('.pass-list-row.selected').forEach(r => {
+                            r.classList.remove('selected');
+                        });
+                        row.classList.add('selected');
+                        showPassDetails(pass);
+                    });
+
+                    fragment.appendChild(row);
+                });
+                passListTableBody.appendChild(fragment);
+            }
+
+            // パス詳細の表示
+            function showPassDetails(pass) {
+                passDetailContainer.classList.remove('hidden');
+                
+                const aosTime = pass.timelineData[0];
+                const losTime = pass.timelineData[pass.timelineData.length - 1];
+
+                passDetailText.innerHTML = `
+                    <!-- AOS -->
+                    <div class="bg-blue-100 p-4 rounded-lg shadow-inner h-full flex flex-col justify-evenly">
+                        <span class="text-sm font-semibold text-blue-800 tracking-wider uppercase">AOS</span>
+                        <span class="text-3xl font-bold text-blue-900">${formatTimeJST(pass.startTime, true)}</span>
+                        <div class="text-sm text-blue-700">
+                            <span>${aosTime.elevation.toFixed(1)}°</span> / 
+                            <span>${aosTime.azimuth.toFixed(0)}° (${azToCompass(aosTime.azimuth)})</span>
+                        </div>
+                    </div>
+                    <!-- MAX -->
+                    <div class="bg-green-100 p-4 rounded-lg shadow-inner h-full flex flex-col justify-evenly">
+                        <span class="text-sm font-semibold text-green-800 tracking-wider uppercase">MAX</span>
+                        <span class="text-3xl font-bold text-green-900">${pass.maxElevation.toFixed(1)}°</span>
+                        <div class="text-sm text-green-700">
+                            <span>${formatTimeJST(pass.maxElevationTime, true)}</span>
+                        </div>
+                         <div class="text-sm text-green-700">
+                            <span>${pass.maxElevationAz.toFixed(0)}° (${azToCompass(pass.maxElevationAz)})</span>
+                        </div>
+                    </div>
+                    <!-- LOS -->
+                    <div class="bg-red-100 p-4 rounded-lg shadow-inner h-full flex flex-col justify-evenly">
+                        <span class="text-sm font-semibold text-red-800 tracking-wider uppercase">LOS</span>
+                        <span class="text-3xl font-bold text-red-900">${formatTimeJST(pass.endTime, true)}</span>
+                        <div class="text-sm text-red-700">
+                            <span>${losTime.elevation.toFixed(1)}°</span> / 
+                            <span>${losTime.azimuth.toFixed(0)}° (${azToCompass(losTime.azimuth)})</span>
+                        </div>
+                    </div>
+                    <!-- Duration -->
+                    <div class="bg-gray-100 p-4 rounded-lg shadow-inner h-full flex flex-col justify-evenly">
+                        <span class="text-sm font-semibold text-gray-800 tracking-wider uppercase">Duration</span>
+                        <span class="text-3xl font-bold text-gray-900">${pass.duration.toFixed(0)}</span>
+                        <div class="text-sm text-gray-700">
+                            <span>分</span>
+                        </div>
+                    </div>
+                `;
+
+                drawPassChart(pass);
+                drawSkyPassChart(pass);
+
+                passDetailContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+
+            // パス詳細のクリア
+            function clearPassDetails() {
+                passDetailContainer.classList.add('hidden');
+                passDetailText.innerHTML = '';
+                passChartCtx.clearRect(0, 0, passChartCanvas.width, passChartCanvas.height);
+                skyPassCtx.clearRect(0, 0, skyPassCanvas.width, skyPassCanvas.height);
+                document.querySelectorAll('.pass-list-row.selected').forEach(r => {
+                    r.classList.remove('selected');
+                });
+            }
+
+            // --- グラフ描画関数 (Canvas) ---
+
+            /**
+             * 仰角グラフを描画する
+             * @param {object} pass - 選択されたパスオブジェクト
+             */
+            function drawPassChart(pass) {
+                const canvas = passChartCanvas;
+                const ctx = passChartCtx;
+                const timeline = pass.timelineData;
+                
+                if (!timeline || timeline.length === 0) {
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    return;
+                }
+                
+                const dpr = window.devicePixelRatio || 1;
+                const rect = canvas.getBoundingClientRect();
+                
+                if (rect.width === 0 || rect.height === 0) {
+                    return;
+                }
+
+                canvas.width = rect.width * dpr;
+                canvas.height = rect.height * dpr;
+                ctx.scale(dpr, dpr);
+                const width = rect.width;
+                const height = rect.height; // height="250" を反映
+
+                ctx.clearRect(0, 0, width, height);
+
+                const padding = { top: 40, right: 20, bottom: 40, left: 40 };
+                const plotWidth = width - padding.left - padding.right;
+                const plotHeight = height - padding.top - padding.bottom;
+
+                const startTime = timeline[0].time;
+                const endTime = timeline[timeline.length - 1].time;
+                const timeRange = endTime.getTime() - startTime.getTime();
+                
+                const getX = (time) => {
+                    if (timeRange === 0) return padding.left;
+                    return padding.left + ((time.getTime() - startTime.getTime()) / timeRange) * plotWidth;
+                };
+
+                const getY = (el) => height - padding.bottom - (el / 90) * plotHeight;
+
+                ctx.strokeStyle = '#e5e7eb';
+                ctx.fillStyle = '#6b7281';
+                ctx.font = '12px sans-serif';
+
+                [0, 30, 60, 90].forEach(el => {
+                    const y = getY(el);
+                    ctx.beginPath();
+                    ctx.moveTo(padding.left, y);
+                    ctx.lineTo(width - padding.right, y);
+                    ctx.stroke();
+                    ctx.fillText(`${el}°`, padding.left - 25, y + 4);
+                });
+
+                const numTimeTicks = Math.min(5, timeline.length - 1);
+                if (numTimeTicks > 0) {
+                    for (let i = 0; i <= numTimeTicks; i++) {
+                        const t = new Date(startTime.getTime() + (timeRange / numTimeTicks) * i);
+                        const x = getX(t);
+                        ctx.beginPath();
+                        ctx.moveTo(x, padding.top);
+                        ctx.lineTo(x, height - padding.bottom);
+                        ctx.stroke();
+                        const label = formatTimeJST(t);
+                        ctx.fillText(label, x - (ctx.measureText(label).width / 2), height - padding.bottom + 20);
+                    }
+                }
+
+                ctx.beginPath();
+                ctx.moveTo(getX(timeline[0].time), getY(timeline[0].elevation));
+                
+                for (let i = 0; i < timeline.length - 1; i++) {
+                    const p1 = timeline[i];
+                    const p2 = timeline[i+1];
+                    const x1 = getX(p1.time);
+                    const y1 = getY(p1.elevation);
+                    const x2 = getX(p2.time);
+                    const y2 = getY(p2.elevation);
+                    const midX = (x1 + x2) / 2;
+                    ctx.quadraticCurveTo(x1, y1, midX, (y1 + y2) / 2);
+                }
+                const last = timeline[timeline.length - 1];
+                ctx.lineTo(getX(last.time), getY(last.elevation));
+
+                ctx.strokeStyle = '#3b82f6';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                ctx.lineTo(getX(last.time), getY(0));
+                ctx.lineTo(getX(timeline[0].time), getY(0));
+                ctx.closePath();
+                ctx.fillStyle = 'rgba(59, 130, 246, 0.1)';
+                ctx.fill();
+
+                ctx.font = '11px sans-serif';
+                const azRadius = 12;
+                const azY = padding.top - 20;
+
+                if (plotWidth < 50) return;
+
+                const azPoints = [];
+                const step = Math.max(1, Math.floor(timeline.length / 10));
+                for (let i = 0; i < timeline.length; i += step) {
+                    azPoints.push(timeline[i]);
+                }
+                if (azPoints.length > 0 && azPoints[azPoints.length-1] !== timeline[timeline.length-1]) {
+                    azPoints.push(timeline[timeline.length-1]);
+                }
+
+                azPoints.forEach((point) => {
+                    const x = getX(point.time);
+                    const az = point.azimuth;
+
+                    ctx.save();
+                    ctx.translate(x, azY);
+
+                    ctx.beginPath();
+                    ctx.arc(0, 0, azRadius, 0, 2 * Math.PI);
+                    ctx.fillStyle = '#f3f4f6';
+                    ctx.strokeStyle = '#d1d5db';
+                    ctx.fill();
+                    ctx.stroke();
+                    
+                    ctx.fillStyle = '#4b5563';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(`${az.toFixed(0)}°`, 0, 0);
+
+                    ctx.rotate(window.satellite.degreesToRadians(az));
+                    ctx.beginPath();
+                    ctx.moveTo(0, -azRadius + 2);
+                    ctx.lineTo(0, -azRadius - 6);
+                    ctx.strokeStyle = '#ef4444';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+
+                    ctx.restore();
+                });
+            }
+
+            /**
+             * スカイパスグラフ (極座標) を描画する
+             * @param {object} pass - 選択されたパスオブジェクト
+             */
+            function drawSkyPassChart(pass) {
+                const canvas = skyPassCanvas;
+                const ctx = skyPassCtx;
+                const timeline = pass.timelineData;
+
+                if (!timeline || timeline.length === 0) {
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    return;
+                }
+
+                const dpr = window.devicePixelRatio || 1;
+                const size = 350;
+                canvas.width = size * dpr;
+                canvas.height = size * dpr;
+                canvas.style.width = `${size}px`;
+                canvas.style.height = `${size}px`;
+
+                ctx.scale(dpr, dpr);
+                
+                ctx.clearRect(0, 0, size, size);
+
+                const center = size / 2;
+                const maxRadius = size / 2 - 20;
+
+                const getCoords = (el, az) => {
+                    const radius = maxRadius * (1 - el / 90);
+                    const angle = window.satellite.degreesToRadians(az - 90); 
+                    
+                    return {
+                        x: center + radius * Math.cos(angle),
+                        y: center + radius * Math.sin(angle)
+                    };
+                };
+
+                ctx.strokeStyle = '#d1d5db';
+                ctx.fillStyle = '#6b7281';
+                ctx.font = '12px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+
+                [0, 30, 60].forEach(el => {
+                    const r = maxRadius * (1 - el / 90);
+                    ctx.beginPath();
+                    ctx.arc(center, center, r, 0, 2 * Math.PI);
+                    ctx.setLineDash([2, 4]);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                    ctx.fillStyle = '#a1a1aa';
+                    ctx.fillText(`${el}°`, center, center - r - 8);
+                });
+                ctx.fillText('90°', center, center - 8);
+
+                ['N', 'E', 'S', 'W'].forEach((dir, i) => {
+                    const angle = window.satellite.degreesToRadians(i * 90 - 90);
+                    const x = center + (maxRadius + 10) * Math.cos(angle);
+                    const y = center + (maxRadius + 10) * Math.sin(angle);
+                    
+                    ctx.beginPath();
+                    ctx.moveTo(center, center);
+                    ctx.lineTo(center + maxRadius * Math.cos(angle), center + maxRadius * Math.sin(angle));
+                    ctx.stroke();
+                    
+                    ctx.fillStyle = '#1f2937';
+                    ctx.font = 'bold 14px sans-serif';
+                    ctx.fillText(dir, x, y);
+                });
+
+                ctx.beginPath();
+                const startPoint = getCoords(timeline[0].elevation, timeline[0].azimuth);
+                ctx.moveTo(startPoint.x, startPoint.y);
+
+                timeline.forEach(point => {
+                    const coords = getCoords(point.elevation, point.azimuth);
+                    ctx.lineTo(coords.x, coords.y);
+                });
+
+                ctx.strokeStyle = '#3b82f6';
+                ctx.lineWidth = 3;
+                ctx.stroke();
+
+                const endPoint = getCoords(timeline[timeline.length - 1].elevation, timeline[timeline.length - 1].azimuth);
+                
+                ctx.beginPath();
+                ctx.arc(startPoint.x, startPoint.y, 5, 0, 2 * Math.PI);
+                ctx.fillStyle = '#22c55e';
+                ctx.fill();
+                ctx.fillText('AOS', startPoint.x, startPoint.y + 15);
+                
+                ctx.beginPath();
+                ctx.arc(endPoint.x, endPoint.y, 5, 0, 2 * Math.PI);
+                ctx.fillStyle = '#ef4444';
+                ctx.fill();
+                ctx.fillText('LOS', endPoint.x, endPoint.y + 15);
+
+                let maxElPoint = timeline[0];
+                let minTimeDiff = Math.abs(timeline[0].time.getTime() - pass.maxElevationTime.getTime());
+
+                for (let i = 1; i < timeline.length; i++) {
+                    const diff = Math.abs(timeline[i].time.getTime() - pass.maxElevationTime.getTime());
+                    if (diff < minTimeDiff) {
+                        minTimeDiff = diff;
+                        maxElPoint = timeline[i];
+                    }
+                }
+                
+                if (maxElPoint) {
+                    const maxPoint = getCoords(maxElPoint.elevation, maxElPoint.azimuth);
+                    ctx.beginPath();
+                    ctx.arc(maxPoint.x, maxPoint.y, 6, 0, 2 * Math.PI);
+                    ctx.fillStyle = '#f59e0b';
+                    ctx.fill();
+                }
+            }
+
+
+            // --- ヘルパー関数 ---
+
+            function formatTimeJST(date, showSeconds = false) {
+                const options = {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    timeZone: 'Asia/Tokyo',
+                    hour12: false
+                };
+                if (showSeconds) {
+                    options.second = '2-digit';
+                }
+                return new Intl.DateTimeFormat('en-GB', options).format(date);
+            }
+
+            function formatDateJST(date) {
+                return new Intl.DateTimeFormat('ja-JP', {
+                    month: '2-digit',
+                    day: '2-digit',
+                    timeZone: 'Asia/Tokyo'
+                }).format(date);
+            }
+
+            function azToCompass(az) {
+                const directions = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
+                const index = Math.round(az / 22.5) % 16;
+                return directions[index];
+            }
+
+        }; // window.onload 終了
+    </script>
+
+</body>
+</html>

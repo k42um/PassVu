@@ -346,8 +346,13 @@ Line 2"></textarea>
 
             <h3 class="text-2xl font-semibold mb-4">リアルタイム追跡</h3>
             
-            <!-- 現在時刻 (追加) -->
-            <p id="tracking-modal-current-time" class="text-xl text-gray-700 mb-6">--:--:--</p>
+            <!-- 現在時刻 (変更) -->
+            <div class="flex items-center justify-center text-xl text-gray-700 mb-6">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span id="tracking-modal-current-time">--:--:--</span>
+            </div>
 
             <!-- AOS/MAX/LOS (追加) -->
             <div class="grid grid-cols-3 gap-4 mb-8">
@@ -459,7 +464,7 @@ Line 2"></textarea>
             const trackingModalEl = document.getElementById('tracking-modal-el');
             const trackingModalAz = document.getElementById('tracking-modal-az');
             const trackingModalAzCompass = document.getElementById('tracking-modal-az-compass');
-            const trackingModalCurrentTime = document.getElementById('tracking-modal-current-time'); // (追加)
+            const trackingModalCurrentTime = document.getElementById('tracking-modal-current-time'); // (IDをspanに移したので、JSは変更不要)
             const trackingModalAosTime = document.getElementById('tracking-modal-aos-time'); // (追加)
             const trackingModalMaxEl = document.getElementById('tracking-modal-max-el'); // (追加)
             const trackingModalLosTime = document.getElementById('tracking-modal-los-time'); // (追加)

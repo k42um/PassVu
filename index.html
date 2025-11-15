@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Satellites Pass Viewer</title>
+    <title>PassVu</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="icon" href="./favicon.ico">
     <style>
         /* 検索リストが多くの項目を保持できるように高さを調整 */
         #satellite-list-container {
@@ -61,7 +62,7 @@
     <!-- ヘッダー -->
     <header class="bg-white shadow-md">
         <div class="container mx-auto px-6 py-4">
-            <h1 class="text-3xl font-bold text-gray-900">Satellites Pass Viewer</h1>
+            <h1 class="text-3xl font-bold text-gray-900">PassVu</h1>
         </div>
     </header>
 
@@ -71,18 +72,24 @@
         <!-- TLE 取得方法の選択 -->
         <div id="selection-ui" class="flex-grow flex flex-col justify-center mb-8">
             <div class="bg-white p-8 rounded-lg shadow-xl text-center">
-                <h2 class="text-4xl font-bold text-gray-900 mb-2">Satellite Pass Viewer</h2>
-                <p class="text-lg text-gray-600 mb-10">衛星からのパスを受信してみませんか？</p>
+                <!-- <h2 class="text-4xl font-bold text-gray-900 mb-2">PassVu</h2> -->
+                <!-- <p class="text-lg text-gray-600 mb-10">衛星からのパスを受信してみませんか？</p> -->
 
                 <div class="grid md:grid-cols-2 gap-6">
                     <!-- 選択肢 1: Celestrakから取得 -->
                     <button id="fetch-celestrak" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-6 px-8 rounded-lg shadow-lg transition duration-300 ease-in-out transform hover:-translate-y-1">
-                        <span class="text-xl">CelesTrakから取得</span>
+                        <div class = "mb-6"></div>
+                        <span class="text-3xl">CelesTrakから取得</span>
+                        <p class="text-base text-white mt-3 font-normal">現在アクティブな衛星をトラッキングします<br>毎日0時と12時にCelesTrakより自動取得します</p>
+                        <div class = "mb-6"></div>
                     </button>
 
                     <!-- 選択肢 2: TLEを手動で入力 -->
                     <button id="manual-tle" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-6 px-8 rounded-lg shadow-lg transition duration-300 ease-in-out transform hover:-translate-y-1">
-                        <span class="text-xl">TLEを手動入力</span>
+                        <div class = "mb-6"></div>
+                        <span class="text-3xl">TLEを手動で入力</span>
+                        <p class="text-base text-white mt-5 font-normal">TLEデータを手動で入力して衛星をトラッキングします</p>
+                        <div class = "mb-6"></div>
                     </button>
                 </div>
             </div>
@@ -108,7 +115,7 @@
             <!-- フォーム 1: CelesTrakから検索 (最初は非表示) -->
             <div id="celestrak-form" class="hidden bg-white p-8 rounded-lg shadow-xl mb-8">
                 <div class="flex justify-between items-center mb-1">
-                    <h2 class="text-3xl font-semibold">CelesTrak 検索</h2>
+                    <h2 class="text-3xl font-semibold">CelesTrakから検索</h2>
                 </div>
 
                 <!-- 最終取得時刻 -->
@@ -162,21 +169,33 @@ Line 2"></textarea>
         <!-- 可視化エリア (最初は非表示) -->
         <div id="visualization-area" class="hidden bg-white p-8 rounded-lg shadow-xl">
 
-            <!-- 衛星名とオプションボタン -->
-            <div class="flex flex-col md:flex-row justify-between md:items-center mb-6 gap-6">
-                <!-- 左側: 衛星名 -->
-                <div class="flex flex-col gap-2">
-                    <h2 id="satellite-display-name" class="text-4xl font-bold text-gray-900"></h2>
-                </div>
+        <!-- 衛星名 + SatNOGS DB + オプションボタン -->
+        <div class="flex flex-row justify-between items-center mb-6">
+            
+            <!-- 左側：衛星名 ＋ SatNOGS DB -->
+            <div class="flex flex-row items-center gap-4">
+                <h2 id="satellite-display-name" class="text-4xl font-bold text-gray-900"></h2>
 
-                <!-- 右側: オプションボタン -->
-                <button id="settings-button" title="オプション" class="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 transition duration-150 self-start md:self-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
+                <!-- SatNOGS DB ボタン -->
+                <button id="satnogs-button" title="SatNOGS DBを開く" 
+                    class="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 transition duration-150">
+                    <span class="text-sm font-semibold text-gray-700 px-1">SatNOGS DB</span>
                 </button>
             </div>
+
+            <!-- 右端：オプションボタン -->
+            <button id="settings-button" title="オプション" 
+                class="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 transition duration-150">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-700" fill="none"
+                    viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+            </button>
+
+        </div>
+
 
             <!-- 予測パスリスト -->
             <div id="pass-list-container" class="mb-8">
@@ -258,7 +277,7 @@ Line 2"></textarea>
     <!-- フッター -->
     <footer class="bg-white shadow-inner mt-12 py-6">
         <div class="container mx-auto px-6 text-center text-gray-600 text-sm">
-            &copy; 2025 k42uma
+            &copy; 2025 <a href="https://github.com/k42um" target="_blank" rel="noopener noreferrer">k42uma</a>
         </div>
     </footer>
 
@@ -429,6 +448,7 @@ Line 2"></textarea>
             const manualTleError = document.getElementById('manual-tle-error');
 
             const satelliteDisplayName = document.getElementById('satellite-display-name');
+            const satnogsButton = document.getElementById('satnogs-button');
             const settingsButton = document.getElementById('settings-button');
             
             const passListContainer = document.getElementById('pass-list-container');
@@ -515,6 +535,13 @@ Line 2"></textarea>
                     manualTleError.classList.remove('hidden');
                 }
             });
+
+            satnogsButton.addEventListener('click', () => {
+                const satnum = currentSatrec?.satnum;
+                const url = `https://db.satnogs.org/satellite/${satnum}`;
+                window.open(url, '_blank');
+            });
+
 
             settingsButton.addEventListener('click', () => {
                 settingsModal.classList.remove('hidden');

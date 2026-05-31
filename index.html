@@ -709,8 +709,8 @@ Line 2"></textarea>
             }
 
             async function fetchTLEData(group, satelliteToSelect = null) {
-                // celestrak.com に直接アクセス
-                const url = `https://celestrak.com/NORAD/elements/gp.php?GROUP=${group}&FORMAT=tle`;
+                // celestrak.org に直接アクセス
+                const url = `https://celestrak.org/NORAD/elements/gp.php?GROUP=${group}&FORMAT=tle`;
                 
                 loadingSpinner.classList.remove('hidden');
                 loadingText.classList.remove('hidden');
@@ -757,59 +757,58 @@ Line 2"></textarea>
 
                 } catch (error) {
                     console.error('Error fetching TLE data:', error);
-                    
-                    if (error.message.includes("403") || error.message.includes("proxy")) {
-                        loadingText.textContent = '直接アクセスが拒否されました。プロキシ経由で再試行します...';
-                        await fetchTLEDataWithProxy(group, satelliteToSelect);
-                    } else {
-                        loadingText.textContent = `データの取得に失敗しました: ${error.message}`;
-                        loadingSpinner.classList.add('hidden');
-                    }
+                    loadingText.textContent = '直接アクセスに失敗しました。プロキシ経由で再試行します...';
+                    await fetchTLEDataWithProxy(group, satelliteToSelect);
                 }
             }
 
             async function fetchTLEDataWithProxy(group, satelliteToSelect = null) {
-                // api.allorigins.win を使用
-                const proxiedUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://celestrak.org/NORAD/elements/gp.php?GROUP=${group}&FORMAT=tle`)}`;
-                
-                try {
-                    const response = await fetch(proxiedUrl, { cache: 'no-cache' });
-                    
-                    if (!response.ok) {
-                        throw new Error(`Proxy network response was not ok: ${response.status}`);
-                    }
-                    const tleData = await response.text();
-                    
-                    const currentTimestamp = new Date().getTime();
+                const targetUrl = `https://celestrak.org/NORAD/elements/gp.php?GROUP=${group}&FORMAT=tle`;
+                const proxyUrls = [
+                    `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`,
+                    `https://corsproxy.io/?url=${encodeURIComponent(targetUrl)}`
+                ];
 
+                for (const proxiedUrl of proxyUrls) {
                     try {
-                        const cachePayload = {
-                            timestamp: currentTimestamp,
-                            data: tleData
-                        };
-                        localStorage.setItem('tleDataCache', JSON.stringify(cachePayload));
-                    } catch (e) {
-                        console.warn("LocalStorageへのキャッシュ保存に失敗:", e);
-                    }
-                    
-                    allSatellites = parseTLEData(tleData);
-                    isDataFetched = true;
-                    displaySatellites(allSatellites);
-                    displayLastFetchTime(currentTimestamp); 
-                    
-                    loadingSpinner.classList.add('hidden');
-                    loadingText.classList.add('hidden');
-                    satelliteSearch.disabled = false;
+                        loadingText.textContent = `プロキシ経由で取得中...`;
+                        const response = await fetch(proxiedUrl, { cache: 'no-cache' });
 
-                    if (satelliteToSelect) {
-                        autoSelectSatelliteByName(satelliteToSelect);
-                    }
+                        if (!response.ok) {
+                            throw new Error(`Proxy response not ok: ${response.status}`);
+                        }
+                        const tleData = await response.text();
+                        if (!tleData || tleData.trim().length === 0) {
+                            throw new Error('Empty response from proxy');
+                        }
 
-                } catch (proxyError) {
-                    console.error('Error fetching TLE data via proxy:', proxyError);
-                    loadingText.textContent = `プロキシ経由での取得にも失敗しました: ${proxyError.message}`;
-                    loadingSpinner.classList.add('hidden');
+                        const currentTimestamp = new Date().getTime();
+                        try {
+                            localStorage.setItem('tleDataCache', JSON.stringify({ timestamp: currentTimestamp, data: tleData }));
+                        } catch (e) {
+                            console.warn("LocalStorageへのキャッシュ保存に失敗:", e);
+                        }
+
+                        allSatellites = parseTLEData(tleData);
+                        isDataFetched = true;
+                        displaySatellites(allSatellites);
+                        displayLastFetchTime(currentTimestamp);
+
+                        loadingSpinner.classList.add('hidden');
+                        loadingText.classList.add('hidden');
+                        satelliteSearch.disabled = false;
+
+                        if (satelliteToSelect) {
+                            autoSelectSatelliteByName(satelliteToSelect);
+                        }
+                        return;
+                    } catch (proxyError) {
+                        console.error(`プロキシ経由での取得に失敗 (${proxiedUrl}):`, proxyError);
+                    }
                 }
+
+                loadingText.textContent = `データの取得に失敗しました。時間をおいて再度お試しください。`;
+                loadingSpinner.classList.add('hidden');
             }
 
             function parseTLEData(data) {
